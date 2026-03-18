@@ -11,17 +11,11 @@ const { TextArea } = Input;
 
 const Characters = () => {
   const [characters, setCharacters] = useState([]);
-  const [filteredCharacters, setFilteredCharacters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm();
-
-  // State untuk filter dan pencarian
-  const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [kingdomFilter, setKingdomFilter] = useState('');
 
   // Helper: get kingdom server number
   const getKingdom = (kingdomId) => {

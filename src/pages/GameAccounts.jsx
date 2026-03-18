@@ -93,6 +93,15 @@ const GameAccounts = () => {
     }
   };
 
+  // Copy text to clipboard
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      message.success('Berhasil disalin!');
+    }).catch(() => {
+      message.error('Gagal menyalin teks');
+    });
+  };
+
   // Definisi kolom tabel
   const columns = [
     {
@@ -100,7 +109,7 @@ const GameAccounts = () => {
       dataIndex: 'email',
       key: 'email',
       fontWeight: 'bold',
-      render: (email, record) => (
+      render: (email) => (
         <Space>
           <span>{email}</span>
           <Button
@@ -117,7 +126,7 @@ const GameAccounts = () => {
       title: 'Password',
       dataIndex: 'password',
       key: 'password',
-      render: (pw, record) => (
+      render: (pw) => (
         <Space>
           <span>{pw || '-'}</span>
           <Button
