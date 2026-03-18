@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 // 1. IMPORT KOMPONEN HALAMAN BARU DI SINI
 import GameAccounts from "./pages/GameAccounts"; // Sesuaikan path-nya jika Anda memasukkannya ke folder /pages
+import Characters from "./pages/Characters"; // Sesuaikan path-nya jika Anda memasukkannya ke folder /pages
 
 function App() {
   return (
@@ -16,6 +17,8 @@ function App() {
           
           {/* 2. DAFTARKAN SUB-ROUTE DI DALAM DASHBOARD */}
           <Route path="game-accounts" element={<GameAccounts />} />
+
+          <Route path="characters" element={<Characters />} />
           
           {/* Nanti jika Anda membuat halaman Orders, daftarkan di sini juga */}
           {/* <Route path="orders" element={<Orders />} /> */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
@@ -100,6 +100,35 @@ const GameAccounts = () => {
       dataIndex: 'email',
       key: 'email',
       fontWeight: 'bold',
+      render: (email, record) => (
+        <Space>
+          <span>{email}</span>
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            size="small"
+            onClick={() => copyToClipboard(email)}
+            title="Salin Email"
+          />
+        </Space>
+      ),
+    },
+    {
+      title: 'Password',
+      dataIndex: 'password',
+      key: 'password',
+      render: (pw, record) => (
+        <Space>
+          <span>{pw || '-'}</span>
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            size="small"
+            onClick={() => copyToClipboard(pw || '')}
+            title="Salin Password"
+          />
+        </Space>
+      ),
     },
     {
       title: 'Login via',
@@ -180,6 +209,14 @@ const GameAccounts = () => {
             rules={[{ required: true, message: 'Email tidak boleh kosong!' }, { type: 'email', message: 'Format email salah!' }]}
           >
             <Input placeholder="Masukkan email akun game" />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, message: 'Password tidak boleh kosong!' }]}
+          >
+            <Input.Password placeholder="Masukkan password akun game" />
           </Form.Item>
 
           <Form.Item

@@ -38,8 +38,10 @@ export const runMigration = async () => {
     // 3. Migrasi Game Accounts
     for (const item of accountsData) {
       await setDoc(doc(db, "game_accounts", item.id.toString()), {
-        // Coba baca item.email, jika tidak ada coba item.account_email, jika tidak ada juga beri teks default
-        email: item.email || item.account_email || "tanpa_email@domain.com",
+        // Email diisi dari email, account_email, atau username (agar tidak kosong)
+        email: item.email || item.account_email || item.username || "tanpa_email@domain.com",
+        username: item.username || "-",
+        password: item.password || "-",
         login_method: item.login_method || "unknown",
         status: item.status || "active",
         notes: item.notes || "",
