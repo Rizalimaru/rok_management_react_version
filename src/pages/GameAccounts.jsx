@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const { Title } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
+const { Search } = AntInput; // Menggunakan komponen Search dari Ant Design
 
 const GameAccounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -14,9 +15,12 @@ const GameAccounts = () => {
   
   // State untuk Modal Form
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState(null); // Jika null berarti mode "Tambah", jika ada ID berarti mode "Edit"
+  const [editingId, setEditingId] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm();
+
+  // State untuk pencarian
+  const [searchText, setSearchText] = useState('');
 
   // 1. READ: Mengambil data dari Firestore secara real-time
   useEffect(() => {
@@ -32,32 +36,27 @@ const GameAccounts = () => {
     return () => unsubscribe();
   }, []);
 
-  // Buka Modal untuk Tambah
   const showAddModal = () => {
     form.resetFields();
     setEditingId(null);
     setIsModalVisible(true);
   };
 
-  // Buka Modal untuk Edit
   const showEditModal = (record) => {
-    form.setFieldsValue(record); // Isi form dengan data yang dipilih
+    form.setFieldsValue(record);
     setEditingId(record.id);
     setIsModalVisible(true);
   };
 
-  // Tutup Modal
   const handleCancel = () => {
     setIsModalVisible(false);
     form.resetFields();
   };
 
-  // 2. CREATE & UPDATE: Submit Form
   const handleFinish = async (values) => {
     setFormLoading(true);
     try {
       if (editingId) {
-        // Mode UPDATE
         const docRef = doc(db, 'game_accounts', editingId);
         await updateDoc(docRef, {
           ...values,
@@ -65,7 +64,6 @@ const GameAccounts = () => {
         });
         message.success('Akun berhasil diperbarui!');
       } else {
-        // Mode CREATE
         const accountsRef = collection(db, 'game_accounts');
         await addDoc(accountsRef, {
           ...values,
@@ -83,7 +81,6 @@ const GameAccounts = () => {
     }
   };
 
-  // 3. DELETE: Hapus Data
   const handleDelete = async (id) => {
     try {
       await deleteDoc(doc(db, 'game_accounts', id));
@@ -93,62 +90,42 @@ const GameAccounts = () => {
     }
   };
 
-  // Copy text to clipboard
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      message.success('Berhasil disalin!');
-    }).catch(() => {
-      message.error('Gagal menyalin teks');
-    });
-  };
-
-  // Definisi kolom tabel
+  // Definisi kolom tabel dengan penambahan fitur Filter
   const columns = [
     {
       title: 'Email Akun',
       dataIndex: 'email',
       key: 'email',
       fontWeight: 'bold',
-      render: (email) => (
-        <Space>
-          <span>{email}</span>
-          <Button
-            type="text"
-            icon={<CopyOutlined />}
-            size="small"
-            onClick={() => copyToClipboard(email)}
-            title="Salin Email"
-          />
-        </Space>
-      ),
-    },
-    {
-      title: 'Password',
-      dataIndex: 'password',
-      key: 'password',
-      render: (pw) => (
-        <Space>
-          <span>{pw || '-'}</span>
-          <Button
-            type="text"
-            icon={<CopyOutlined />}
-            size="small"
-            onClick={() => copyToClipboard(pw || '')}
-            title="Salin Password"
-          />
-        </Space>
-      ),
+      // Menambahkan fitur sorting alfebetik berdasarkan email
+      sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
     },
     {
       title: 'Login via',
       dataIndex: 'login_method',
       key: 'login_method',
+      // Fitur Filter Metode Login
+      filters: [
+        { text: 'Google', value: 'google' },
+        { text: 'Facebook', value: 'facebook' },
+        { text: 'Lilith', value: 'lilith' },
+        { text: 'Apple ID', value: 'apple' },
+      ],
+      onFilter: (value, record) => record.login_method === value,
       render: (method) => <span style={{ textTransform: 'capitalize' }}>{method || '-'}</span>
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      // Fitur Filter Status Akun
+      filters: [
+        { text: 'Active', value: 'active' },
+        { text: 'Resting', value: 'resting' },
+        { text: 'Process', value: 'process' },
+        { text: 'Banned', value: 'banned' },
+      ],
+      onFilter: (value, record) => record.status === value,
       render: (status) => {
         let color = status === 'active' ? 'green' : status === 'banned' ? 'red' : status === 'resting' ? 'orange' : 'default';
         return <Tag color={color}>{status?.toUpperCase() || 'UNKNOWN'}</Tag>;
@@ -180,19 +157,40 @@ const GameAccounts = () => {
     },
   ];
 
+  // Logika untuk Global Search (Mencari berdasarkan Email atau Catatan/Notes)
+  const filteredAccounts = accounts.filter((acc) => {
+    const searchLower = searchText.toLowerCase();
+    
+    const emailMatch = (acc.email || '').toLowerCase().includes(searchLower);
+    const notesMatch = (acc.notes || '').toLowerCase().includes(searchLower);
+
+    return emailMatch || notesMatch;
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
         <Title level={3} style={{ margin: 0 }}>Game Accounts</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} style={{ background: '#d1a054', borderColor: '#d1a054' }}>
-          Tambah Akun
-        </Button>
+        
+        <Space style={{ flexWrap: 'wrap' }}>
+          {/* Kotak Pencarian Global */}
+          <Search 
+            placeholder="Cari Email / Notes..." 
+            allowClear 
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 250 }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} style={{ background: '#d1a054', borderColor: '#d1a054' }}>
+            Tambah Akun
+          </Button>
+        </Space>
       </div>
 
       <Card>
         <Table 
           columns={columns} 
-          dataSource={accounts} 
+          // Menggunakan data yang sudah difilter oleh pencarian
+          dataSource={filteredAccounts} 
           rowKey="id" 
           loading={loading}
           pagination={{ pageSize: 10 }}
@@ -204,7 +202,7 @@ const GameAccounts = () => {
         title={editingId ? "Edit Game Account" : "Tambah Game Account Baru"}
         open={isModalVisible}
         onCancel={handleCancel}
-        footer={null} // Kita gunakan tombol submit dari dalam form
+        footer={null} 
       >
         <Form
           form={form}
@@ -218,14 +216,6 @@ const GameAccounts = () => {
             rules={[{ required: true, message: 'Email tidak boleh kosong!' }, { type: 'email', message: 'Format email salah!' }]}
           >
             <Input placeholder="Masukkan email akun game" />
-          </Form.Item>
-
-          <Form.Item
-            name="password"
-            label="Password"
-            rules={[{ required: true, message: 'Password tidak boleh kosong!' }]}
-          >
-            <Input.Password placeholder="Masukkan password akun game" />
           </Form.Item>
 
           <Form.Item
@@ -256,7 +246,7 @@ const GameAccounts = () => {
 
           <Form.Item
             name="notes"
-            label="CatatanTambahan"
+            label="Catatan Tambahan"
           >
             <TextArea rows={3} placeholder="Misal: Akun khusus untuk farming kayu..." />
           </Form.Item>

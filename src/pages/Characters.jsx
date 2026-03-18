@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, SearchOutlined, FilterOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import kingdomsData from '../data/kingdoms.json';
@@ -8,6 +8,7 @@ import kingdomsData from '../data/kingdoms.json';
 const { Title } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
+const { Search } = AntInput; // Menggunakan komponen Search dari Ant Design
 
 const Characters = () => {
   const [characters, setCharacters] = useState([]);
@@ -16,6 +17,9 @@ const Characters = () => {
   const [editingId, setEditingId] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm();
+  
+  // State untuk pencarian
+  const [searchText, setSearchText] = useState('');
 
   // Helper: get kingdom server number
   const getKingdom = (kingdomId) => {
@@ -109,6 +113,11 @@ const Characters = () => {
       .catch(() => message.error('Gagal menyalin!'));
   };
 
+  // Menghasilkan daftar filter Kingdom unik dari data yang ada
+  const kingdomFilters = Array.from(new Set(characters.map(c => c.kingdom)))
+    .filter(k => k !== '-')
+    .map(k => ({ text: k, value: k }));
+
   const columns = [
     {
       title: 'IGN',
@@ -130,17 +139,27 @@ const Characters = () => {
       dataIndex: 'kingdom',
       key: 'kingdom',
       render: (kingdom) => kingdom || '-',
+      // Fitur Filter Kolom Kingdom
+      filters: kingdomFilters,
+      onFilter: (value, record) => record.kingdom === value,
     },
     {
       title: 'Power',
       dataIndex: 'power',
       key: 'power',
-      render: (power) => power ? power.toLocaleString() : '-',
+      render: (power) => power ? Number(power).toLocaleString() : '-',
+      sorter: (a, b) => Number(a.power || 0) - Number(b.power || 0), // Tambahan fitur sorting power
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      // Fitur Filter Kolom Status
+      filters: [
+        { text: 'Ready', value: 'ready' },
+        { text: 'Banned', value: 'banned' },
+      ],
+      onFilter: (value, record) => record.status === value,
       render: (status) => {
         let color = status === 'ready' ? 'green' : status === 'banned' ? 'red' : 'default';
         return <Tag color={color}>{status?.toUpperCase() || '-'}</Tag>;
@@ -168,23 +187,50 @@ const Characters = () => {
     },
   ];
 
+  // Logika untuk Global Search (Mencari berdasarkan IGN atau Email Akun)
+  const filteredCharacters = characters.filter((char) => {
+    const searchLower = searchText.toLowerCase();
+    
+    // Cek IGN
+    const ignMatch = (char.ign || '').toLowerCase().includes(searchLower);
+    
+    // Cek Email/Username Akun Game
+    const acc = accounts.find(a => String(a.id) === String(char.game_account_id));
+    const accMatch = (acc?.email || acc?.username || '').toLowerCase().includes(searchLower);
+
+    return ignMatch || accMatch;
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
         <Title level={3} style={{ margin: 0 }}>Characters</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} style={{ background: '#d1a054', borderColor: '#d1a054' }}>
-          Tambah Karakter
-        </Button>
+        
+        <Space style={{ flexWrap: 'wrap' }}>
+          {/* Kotak Pencarian Global */}
+          <Search 
+            placeholder="Cari IGN / Email Akun..." 
+            allowClear 
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 250 }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} style={{ background: '#d1a054', borderColor: '#d1a054' }}>
+            Tambah Karakter
+          </Button>
+        </Space>
       </div>
       <Card>
         <Table
           columns={columns}
-          dataSource={characters}
+          // Menggunakan data yang sudah difilter oleh pencarian
+          dataSource={filteredCharacters}
           rowKey="id"
           loading={loading}
           pagination={{ pageSize: 10 }}
         />
       </Card>
+      
+      {/* Modal Form */}
       <Modal
         title={editingId ? 'Edit Character' : 'Tambah Character Baru'}
         open={isModalVisible}
