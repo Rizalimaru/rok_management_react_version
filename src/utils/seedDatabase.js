@@ -55,9 +55,16 @@ export const runMigration = async () => {
       await setDoc(doc(db, "characters", item.id.toString()), {
         game_account_id: item.game_account_id ? item.game_account_id.toString() : null,
         kingdom_id: item.kingdom_id ? item.kingdom_id.toString() : null,
-        name: item.ign || "Unknown", // Menggunakan ign sebagai name
+        name: item.ign || "Unknown",
         power: item.power || 0,
         status: item.status || "ready",
+        // TAMBAHAN: Memasukkan data resources dari SQLite ke object bersarang
+        resources: {
+          food: item.food || 0,
+          wood: item.wood || 0,
+          stone: item.stone || 0,
+          gold: item.gold || 0
+        },
         created_at: serverTimestamp(),
       });
     }
