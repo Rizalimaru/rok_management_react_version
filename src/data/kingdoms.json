@@ -1,0 +1,156 @@
+[
+    {
+        "created_at": "2026-01-09 02:39:17",
+        "id": 1,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3873",
+        "updated_at": "2026-01-09 02:39:17"
+    },
+    {
+        "created_at": "2026-01-09 02:39:30",
+        "id": 2,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3874",
+        "updated_at": "2026-01-09 02:39:30"
+    },
+    {
+        "created_at": "2026-01-09 02:42:20",
+        "id": 3,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3879",
+        "updated_at": "2026-01-09 02:42:20"
+    },
+    {
+        "created_at": "2026-01-09 02:42:51",
+        "id": 4,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3895",
+        "updated_at": "2026-01-09 02:42:51"
+    },
+    {
+        "created_at": "2026-01-09 02:52:29",
+        "id": 5,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3894",
+        "updated_at": "2026-01-09 02:52:29"
+    },
+    {
+        "created_at": "2026-01-09 03:30:22",
+        "id": 6,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3908",
+        "updated_at": "2026-01-09 03:30:22"
+    },
+    {
+        "created_at": "2026-01-09 04:24:02",
+        "id": 7,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3902",
+        "updated_at": "2026-01-09 04:24:02"
+    },
+    {
+        "created_at": "2026-01-09 04:30:50",
+        "id": 8,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3899",
+        "updated_at": "2026-01-09 04:30:50"
+    },
+    {
+        "created_at": "2026-01-09 04:35:08",
+        "id": 9,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3897",
+        "updated_at": "2026-01-09 04:35:08"
+    },
+    {
+        "created_at": "2026-01-09 04:36:06",
+        "id": 10,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3919",
+        "updated_at": "2026-01-09 04:36:06"
+    },
+    {
+        "created_at": "2026-01-09 04:39:44",
+        "id": 11,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3911",
+        "updated_at": "2026-01-09 04:39:44"
+    },
+    {
+        "created_at": "2026-01-09 04:40:52",
+        "id": 12,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3916",
+        "updated_at": "2026-01-09 04:40:52"
+    },
+    {
+        "created_at": "2026-01-09 04:45:35",
+        "id": 13,
+        "name": null,
+        "price_food": 0,
+        "price_gold": 0,
+        "price_stone": 0,
+        "price_wood": 0,
+        "server_number": "3926",
+        "updated_at": "2026-01-09 04:45:35"
+    },
+    {
+        "created_at": "2026-02-24 17:01:03",
+        "id": 14,
+        "name": null,
+        "price_food": 700,
+        "price_gold": 1000,
+        "price_stone": 700,
+        "price_wood": 700,
+        "server_number": "4007",
+        "updated_at": "2026-02-24 17:06:12"
+    }
+]
