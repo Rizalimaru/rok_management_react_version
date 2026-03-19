@@ -1,9 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./pages/login";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import GameAccounts from "./pages/GameAccounts";
 import Characters from "./pages/Characters";
-import Kingdoms from "./pages/Kingdoms"; // 1. Tambahkan Import ini
+import Kingdoms from "./pages/Kingdoms";
+import Customers from "./pages/Customers"; // 1. Tambahkan Import Ini
 
 function App() {
   return (
@@ -21,9 +22,10 @@ function App() {
           
           <Route path="game-accounts" element={<GameAccounts />} />
           <Route path="characters" element={<Characters />} />
-          
-          {/* 2. Tambahkan Route untuk Kingdoms di sini */}
           <Route path="kingdoms" element={<Kingdoms />} />
+          
+          {/* 2. Tambahkan Route Customers Di Sini */}
+          <Route path="customers" element={<Customers />} />
           
         </Route>
       </Routes>
