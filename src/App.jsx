@@ -6,6 +6,7 @@ import GameAccounts from "./pages/GameAccounts";
 import Characters from "./pages/Characters";
 import Kingdoms from "./pages/Kingdoms";
 import Customers from "./pages/Customers";
+import Orders from "./pages/Order";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="characters" element={<Characters />} />
           <Route path="kingdoms" element={<Kingdoms />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="orders" element={<Orders />} />
         </Route>
       </Routes>
     </Router>
