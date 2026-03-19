@@ -187,7 +187,7 @@ const Customers = () => {
         </Space>
       </div>
 
-      <Card bodyStyle={{ padding: 0, overflowX: 'auto' }}>
+      <Card styles={{ body: { padding: 0, overflowX: 'auto' } }}>
         <Table 
           columns={columns} 
           dataSource={filteredCustomers} 

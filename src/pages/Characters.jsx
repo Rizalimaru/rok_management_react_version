@@ -271,8 +271,15 @@ const Characters = () => {
         </Space>
       </div>
       
-      <Card bodyStyle={{ padding: 0, overflowX: 'auto' }}>
-        <Table columns={columns} dataSource={filteredCharacters} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 1300 }} />
+      <Card styles={{ body: { padding: 0, overflowX: 'auto' } }}>
+        <Table 
+          columns={columns} 
+          dataSource={filteredCharacters} 
+          rowKey="id" 
+          loading={loading} 
+          pagination={{ pageSize: 10 }} 
+          scroll={{ x: 1300 }} 
+        />
       </Card>
       
       {/* MODAL 1: EDIT/TAMBAH PROFIL KARAKTER (BESAR) */}
