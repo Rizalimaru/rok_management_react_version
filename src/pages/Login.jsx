@@ -42,6 +42,9 @@ const Login = () => {
     }
   };
 
+  // Menggunakan BASE_URL bawaan Vite agar path file di public menyesuaikan dengan GitHub Pages
+  const basePath = import.meta.env.BASE_URL;
+
   return (
     <Row style={{ minHeight: '100vh', backgroundColor: '#ffffff' }}>
       
@@ -49,8 +52,8 @@ const Login = () => {
       <Col 
         xs={0} sm={0} md={12} lg={12} 
         style={{
-          // Ganti URL ini dengan gambar banner yang Anda miliki di folder public
-          background: `url('/rok_1.jpg') no-repeat center center`,
+          // UPDATE DI SINI: Menggunakan template literal untuk menyisipkan basePath
+          background: `url('${basePath}rok_1.jpg') no-repeat center center`,
           backgroundSize: 'cover',
           backgroundColor: '#f3f4f6', // Warna cadangan jika gambar tidak ada
           position: 'relative',
@@ -80,10 +83,19 @@ const Login = () => {
             "We've been using this system to manage hundreds of Rise of Kingdoms accounts effortlessly."
           </Title>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '24px' }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#d1a054' }}></div>
+            <img
+              // UPDATE DI SINI JUGA: Menambahkan basePath untuk foto profil
+              src={`${basePath}profile.jpg`}
+              alt="Rizalimaru Luca"
+              style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.8)' }}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://avatars.githubusercontent.com/u/113398108?s=96&v=4';
+              }}
+            />
             <div>
-              <Text strong style={{ display: 'block', color: '#101828' }}>Admin Name</Text>
-              <Text style={{ color: '#475467' }}>Lead Manager</Text>
+              <Text strong style={{ display: 'block', color: '#101828' }}>Rizalimaru "Luca"</Text>
+              <Text style={{ color: '#475467' }}>Lead Programmer of C&C Studio</Text>
             </div>
           </div>
         </div>
