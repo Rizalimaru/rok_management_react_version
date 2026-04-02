@@ -54,6 +54,11 @@ const GameAccounts = () => {
   };
 
   const handleFinish = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     setFormLoading(true);
     try {
       if (editingId) {
@@ -82,6 +87,11 @@ const GameAccounts = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'game_accounts', id));
       message.success('Akun berhasil dihapus!');

@@ -52,6 +52,11 @@ const Customers = () => {
   };
 
   const handleFinish = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     setFormLoading(true);
     try {
       if (editingId) {
@@ -82,6 +87,11 @@ const Customers = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'customers', id));
       message.success('Data pelanggan berhasil dihapus!');

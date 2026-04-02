@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Row, Col, InputNumber, Divider, Progress, Tooltip } from 'antd';
+import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Row, Col, InputNumber, Divider, Progress, Tooltip, DatePicker } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, MinusCircleOutlined, SendOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -20,8 +20,9 @@ const Orders = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // State untuk Pencarian
+  // State untuk Pencarian & Filter
   const [searchText, setSearchText] = useState('');
+  const [filterMonth, setFilterMonth] = useState(null); 
 
   // State untuk Update Progress Cepat
   const [isProgressModalVisible, setIsProgressModalVisible] = useState(false);
@@ -29,15 +30,30 @@ const Orders = () => {
   const [activeItemIndex, setActiveItemIndex] = useState(null);
   const [progressForm] = Form.useForm();
 
-  // 1. Sinkronisasi Data secara Real-time
+  const parseNumber = (value) => {
+    const normalized = String(value || '0').replace(/[^\d.-]/g, '');
+    return normalized === '' ? 0 : Number(normalized);
+  };
+
+  // 1. Sinkronisasi Data secara Real-time & Urutkan Data
   useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      let fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      fetchedOrders.sort((a, b) => {
+        const dateA = a.created_at?.toDate ? a.created_at.toDate().getTime() : Date.now();
+        const dateB = b.created_at?.toDate ? b.created_at.toDate().getTime() : Date.now();
+        return dateB - dateA; 
+      });
+
+      setOrders(fetchedOrders);
       setLoading(false);
     });
+
     const unsubCust = onSnapshot(collection(db, 'customers'), (snapshot) => {
       setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+
     const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
       setKingdoms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -48,6 +64,8 @@ const Orders = () => {
   // 2. Handler Modal Utama
   const showAddModal = () => {
     form.resetFields();
+    const autoInvoice = `INV-${Date.now()}`;
+    form.setFieldsValue({ order_number: autoInvoice, status: 'pending' });
     setEditingId(null);
     setIsModalVisible(true);
   };
@@ -58,18 +76,28 @@ const Orders = () => {
     setIsModalVisible(true);
   };
 
+  // --- PROTEKSI KONEKSI: CREATE & UPDATE ORDER ---
   const handleFinish = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     setFormLoading(true);
     try {
       const payload = {
         ...values,
-        total_price: Number(values.total_price || 0),
-        items: values.items.map(item => ({
-          ...item,
-          amount: Number(item.amount || 0),
-          amount_filled: Number(item.amount_filled || 0),
-          is_completed: (item.amount_filled >= item.amount) ? 1 : 0
-        })),
+        total_price: parseNumber(values.total_price),
+        items: values.items?.map(item => {
+          const amount = parseNumber(item.amount);
+          const amountFilled = parseNumber(item.amount_filled);
+          return {
+            ...item,
+            amount,
+            amount_filled: amountFilled,
+            is_completed: amountFilled >= amount ? 1 : 0
+          };
+        }) || [],
         updated_at: serverTimestamp()
       };
 
@@ -79,8 +107,7 @@ const Orders = () => {
       } else {
         await addDoc(collection(db, 'orders'), { 
           ...payload, 
-          created_at: serverTimestamp(),
-          order_number: values.order_number || `ORD-${Date.now()}`
+          created_at: serverTimestamp()
         });
         message.success('Pesanan baru berhasil dibuat!');
       }
@@ -92,14 +119,18 @@ const Orders = () => {
     }
   };
 
-  // 3. Handler Update Progress Live
+  // --- PROTEKSI KONEKSI: UPDATE PROGRESS ---
   const handleUpdateProgress = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Progress tidak dapat diupdate saat offline.');
+      return;
+    }
+
     const newItems = [...activeOrder.items];
     const item = newItems[activeItemIndex];
     
-    // Tambahkan jumlah baru ke progress yang sudah ada
-    item.amount_filled = (Number(item.amount_filled) || 0) + Number(values.add_amount);
-    item.is_completed = (item.amount_filled >= item.amount) ? 1 : 0;
+    item.amount_filled = parseNumber(item.amount_filled) + parseNumber(values.add_amount);
+    item.is_completed = item.amount_filled >= parseNumber(item.amount) ? 1 : 0;
 
     try {
       await updateDoc(doc(db, 'orders', activeOrder.id), {
@@ -113,6 +144,39 @@ const Orders = () => {
       message.error('Gagal memperbarui progress');
     }
   };
+
+  // --- PROTEKSI KONEKSI: HAPUS ORDER ---
+  const handleDeleteOrder = async (id) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menghapus pesanan saat offline.');
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'orders', id));
+      message.success('Pesanan berhasil dihapus!');
+    } catch (error) {
+      message.error('Gagal menghapus pesanan: ' + error.message);
+    }
+  };
+
+  // --- FILTER DATA UNTUK TABEL ---
+  const filteredOrders = orders.filter(o => {
+    const matchText = 
+      (o.order_number || '').toLowerCase().includes(searchText.toLowerCase()) ||
+      customers.find(c => String(c.id) === String(o.customer_id))?.name?.toLowerCase().includes(searchText.toLowerCase());
+
+    let matchMonth = true;
+    if (filterMonth && o.created_at) {
+      const orderDate = o.created_at?.toDate ? o.created_at.toDate() : new Date();
+      const yyyy = orderDate.getFullYear();
+      const mm = String(orderDate.getMonth() + 1).padStart(2, '0');
+      const orderMonthStr = `${yyyy}-${mm}`;
+      matchMonth = orderMonthStr === filterMonth;
+    }
+
+    return matchText && matchMonth;
+  });
 
   // --- KOLOM TABEL UTAMA ---
   const columns = [
@@ -158,7 +222,7 @@ const Orders = () => {
       render: (_, record) => (
         <Space>
           <Button type="text" icon={<EditOutlined />} onClick={() => showEditModal(record)} title="Edit Order" />
-          <Popconfirm title="Hapus pesanan ini?" onConfirm={() => deleteDoc(doc(db, 'orders', record.id))}>
+          <Popconfirm title="Hapus pesanan ini?" onConfirm={() => handleDeleteOrder(record.id)}>
             <Button type="text" danger icon={<DeleteOutlined />} title="Hapus Order" />
           </Popconfirm>
         </Space>
@@ -174,8 +238,6 @@ const Orders = () => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
           {record.items?.map((item, idx) => {
             const percent = Math.min(100, Math.round((item.amount_filled / item.amount) * 100) || 0);
-            
-            // UPDATE DI SINI: Cek apakah target sudah tercapai
             const isCompleted = item.amount_filled >= item.amount;
 
             return (
@@ -187,7 +249,6 @@ const Orders = () => {
                     <Text type="secondary"> / {Number(item.amount || 0).toLocaleString('id-ID')}M</Text>
                   </Col>
                   <Col>
-                    {/* UPDATE DI SINI: Disable tombol jika isCompleted true */}
                     <Tooltip title={isCompleted ? "Target Tercapai" : "Input Pengiriman Baru"}>
                       <Button 
                         type="primary" 
@@ -221,14 +282,21 @@ const Orders = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
         <Title level={3} style={{ margin: 0 }}>Orders</Title>
-        <Space>
+        <Space style={{ flexWrap: 'wrap' }}>
+          <DatePicker 
+            picker="month" 
+            placeholder="Pilih Bulan" 
+            allowClear 
+            onChange={(date, dateString) => setFilterMonth(dateString)} 
+            style={{ width: 140 }}
+          />
           <Search 
             placeholder="Cari Invoice / Pelanggan..." 
             allowClear 
             onChange={e => setSearchText(e.target.value)} 
-            style={{ width: 280 }} 
+            style={{ width: 220 }} 
           />
           <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} style={{ background: '#d1a054', borderColor: '#d1a054' }}>
             Tambah Order
@@ -239,10 +307,7 @@ const Orders = () => {
       <Card styles={{ body: { padding: 0 } }}>
         <Table 
           columns={columns} 
-          dataSource={orders.filter(o => 
-            (o.order_number || '').toLowerCase().includes(searchText.toLowerCase()) ||
-            customers.find(c => String(c.id) === String(o.customer_id))?.name?.toLowerCase().includes(searchText.toLowerCase())
-          )} 
+          dataSource={filteredOrders} 
           rowKey="id" 
           loading={loading} 
           scroll={{ x: 800 }} 
@@ -264,10 +329,14 @@ const Orders = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleFinish}>
           <Row gutter={16}>
-            <Col span={6}><Form.Item name="order_number" label="Nomor Invoice" rules={[{ required: true }]}><Input placeholder="INV-001" /></Form.Item></Col>
+            <Col span={6}>
+              <Form.Item name="order_number" label="Nomor Invoice" rules={[{ required: true }]}>
+                <Input readOnly style={{ backgroundColor: '#f5f5f5', color: '#595959' }} />
+              </Form.Item>
+            </Col>
             <Col span={6}><Form.Item name="customer_id" label="Pelanggan" rules={[{ required: true }]}><Select placeholder="Pilih Pelanggan">{customers.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}</Select></Form.Item></Col>
             <Col span={6}><Form.Item name="kingdom_id" label="Kingdom" rules={[{ required: true }]}><Select placeholder="Pilih Kingdom">{kingdoms.map(k => <Option key={k.id} value={k.id}>{k.server_number}</Option>)}</Select></Form.Item></Col>
-            <Col span={6}><Form.Item name="status" label="Status Global" initialValue="pending"><Select><Option value="pending">Pending</Option><Option value="processing">Processing</Option><Option value="completed">Completed</Option></Select></Form.Item></Col>
+            <Col span={6}><Form.Item name="status" label="Status Global" rules={[{ required: true }]}><Select><Option value="pending">Pending</Option><Option value="processing">Processing</Option><Option value="completed">Completed</Option></Select></Form.Item></Col>
           </Row>
 
           <Divider orientation="left">Detail Resource (Items)</Divider>
@@ -308,7 +377,12 @@ const Orders = () => {
           <Row gutter={16} justify="end">
             <Col span={8}>
               <Form.Item name="total_price" label="Total Harga Keseluruhan (Rp)">
-                <InputNumber style={{ width: '100%' }} formatter={val => `Rp ${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} />
+                {/* UPDATE DI SINI: Menambahkan prop parser agar ketikan manual bisa dibaca sistem */}
+                <InputNumber 
+                  style={{ width: '100%' }} 
+                  formatter={val => val ? `Rp ${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''} 
+                  parser={val => val.replace(/[^\d.]/g, '')}
+                />
               </Form.Item>
             </Col>
           </Row>

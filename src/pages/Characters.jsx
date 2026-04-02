@@ -90,6 +90,11 @@ const Characters = () => {
   };
 
   const handleFinish = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     setFormLoading(true);
     try {
       const formattedData = {
@@ -133,6 +138,11 @@ const Characters = () => {
   };
 
   const handleResourceFinish = async (values) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     setResourceFormLoading(true);
     try {
       const docRef = doc(db, 'characters', resourceEditingId);
@@ -156,6 +166,11 @@ const Characters = () => {
 
   // --- HANDLER DELETE & COPY ---
   const handleDelete = async (id) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat menyimpan data ke server saat offline.');
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'characters', id));
       message.success('Karakter berhasil dihapus!');
