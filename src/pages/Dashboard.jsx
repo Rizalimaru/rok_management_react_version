@@ -17,7 +17,8 @@ import {
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '../config/firebase'; 
 import { collection, onSnapshot } from 'firebase/firestore';
-import kingdomsData from '../data/kingdoms.json';
+
+// HAPUS import kingdomsData dari JSON
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -35,10 +36,14 @@ const Dashboard = () => {
     totalKingdoms: 0,
     totalCharacters: 0
   });
+  
   const [characters, setCharacters] = useState([]);
+  // TAMBAHKAN state untuk kingdoms
+  const [kingdoms, setKingdoms] = useState([]);
 
-  const getKingdom = (kingdomId) => {
-    const kingdom = kingdomsData.find(k => String(k.id) === String(kingdomId));
+  // UBAH fungsi getKingdom menggunakan state kingdoms terbaru
+  const getKingdomName = (kingdomId) => {
+    const kingdom = kingdoms.find(k => String(k.id) === String(kingdomId));
     return kingdom ? (kingdom.server_number || kingdom.name || '-') : '-';
   };
 
@@ -53,7 +58,7 @@ const Dashboard = () => {
   const resourceTotalsPerKingdom = useMemo(() => {
     const totals = {};
     characters.forEach((char) => {
-      const kingdom = getKingdom(char.kingdom_id);
+      const kingdom = getKingdomName(char.kingdom_id);
       if (!totals[kingdom]) {
         totals[kingdom] = { food: 0, wood: 0, stone: 0, gold: 0 };
       }
@@ -63,7 +68,7 @@ const Dashboard = () => {
       totals[kingdom].gold += Number(char.resources?.gold || 0);
     });
     return totals;
-  }, [characters]);
+  }, [characters, kingdoms]); // tambahkan kingdoms sebagai dependency
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -132,12 +137,17 @@ const Dashboard = () => {
     });
 
     // Snapshot Characters (Total Karakter)
-    const unsubCharacters = onSnapshot(collection(db, 'characters'), (snapshot) => {
+    const unsubCharactersCount = onSnapshot(collection(db, 'characters'), (snapshot) => {
       setStats(prev => ({ ...prev, totalCharacters: snapshot.size }));
     });
 
-    // Snapshot Kingdoms (Total Server/Kingdom)
+    // Snapshot Kingdoms (Fetch Data & Total Server/Kingdom)
     const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
+      let fetchedKingdoms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Update data kingdoms state
+      setKingdoms(fetchedKingdoms);
+      // Update totalKingdoms di stats
       setStats(prev => ({ ...prev, totalKingdoms: snapshot.size }));
     });
 
@@ -146,7 +156,7 @@ const Dashboard = () => {
       unsubOrders();
       unsubAccounts();
       unsubCustomers();
-      unsubCharacters();
+      unsubCharactersCount();
       unsubKingdoms();
     };
   }, [user]);
@@ -338,9 +348,17 @@ const Dashboard = () => {
                 <div style={{ marginTop: 24 }}>
                   <Title level={5} style={{ marginBottom: 16 }}>Total Resource per Kingdom</Title>
                   <Row gutter={[16, 16]} style={{ marginBottom: '16px' }}>
-                    {Object.entries(resourceTotalsPerKingdom).map(([kingdom, res]) => (
+                    {/* Mengurutkan Object Entries berdasarkan nama kingdom (angka) agar tampil dari terkecil ke terbesar */}
+                    {Object.entries(resourceTotalsPerKingdom)
+                      .sort(([kingA], [kingB]) => {
+                        const numA = parseInt(kingA);
+                        const numB = parseInt(kingB);
+                        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                        return String(kingA).localeCompare(String(kingB));
+                      })
+                      .map(([kingdom, res]) => (
                       <Col xs={24} sm={12} md={8} lg={6} key={kingdom}>
-                        <Card size="small" title={kingdom} bordered={true} style={{ borderTop: '3px solid #d1a054' }}>
+                        <Card size="small" title={`Server ${kingdom}`} bordered={true} style={{ borderTop: '3px solid #d1a054' }}>
                           <Row justify="space-between" style={{ marginBottom: 4 }}>
                             <Text>Food 🌽</Text><Text strong>{formatNumber(res.food)}</Text>
                           </Row>

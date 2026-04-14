@@ -4,10 +4,11 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
-const { Title } = Typography;
+// Tambahkan Text dari Typography untuk fitur copyable
+const { Title, Text } = Typography; 
 const { Option } = Select;
 const { TextArea } = Input;
-const { Search } = AntInput; // Menggunakan komponen Search dari Ant Design
+const { Search } = AntInput; 
 
 const GameAccounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -100,21 +101,26 @@ const GameAccounts = () => {
     }
   };
 
-  // Definisi kolom tabel dengan penambahan fitur Filter
+  // Definisi kolom tabel
   const columns = [
     {
       title: 'Email Akun',
       dataIndex: 'email',
       key: 'email',
       fontWeight: 'bold',
-      // Menambahkan fitur sorting alfebetik berdasarkan email
       sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
+    },
+    // --- TAMBAHAN KOLOM PASSWORD ---
+    {
+      title: 'Password',
+      dataIndex: 'password',
+      key: 'password',
+      render: (text) => text ? <Text copyable={{ text }}>{text}</Text> : '-',
     },
     {
       title: 'Login via',
       dataIndex: 'login_method',
       key: 'login_method',
-      // Fitur Filter Metode Login
       filters: [
         { text: 'Google', value: 'google' },
         { text: 'Facebook', value: 'facebook' },
@@ -128,7 +134,6 @@ const GameAccounts = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      // Fitur Filter Status Akun
       filters: [
         { text: 'Active', value: 'active' },
         { text: 'Resting', value: 'resting' },
@@ -183,7 +188,6 @@ const GameAccounts = () => {
         <Title level={3} style={{ margin: 0 }}>Game Accounts</Title>
         
         <Space style={{ flexWrap: 'wrap' }}>
-          {/* Kotak Pencarian Global */}
           <Search 
             placeholder="Cari Email / Notes..." 
             allowClear 
@@ -199,7 +203,6 @@ const GameAccounts = () => {
       <Card>
         <Table 
           columns={columns} 
-          // Menggunakan data yang sudah difilter oleh pencarian
           dataSource={filteredAccounts} 
           rowKey="id" 
           loading={loading}
@@ -226,6 +229,15 @@ const GameAccounts = () => {
             rules={[{ required: true, message: 'Email tidak boleh kosong!' }, { type: 'email', message: 'Format email salah!' }]}
           >
             <Input placeholder="Masukkan email akun game" />
+          </Form.Item>
+
+          {/* --- TAMBAHAN FORM INPUT PASSWORD --- */}
+          <Form.Item
+            name="password"
+            label="Password Akun"
+            rules={[{ required: true, message: 'Password tidak boleh kosong!' }]}
+          >
+            <Input.Password placeholder="Masukkan password akun game" />
           </Form.Item>
 
           <Form.Item
