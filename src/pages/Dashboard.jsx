@@ -17,6 +17,7 @@ import {
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '../config/firebase'; 
 import { collection, onSnapshot } from 'firebase/firestore';
+import AdminChat from '../components/AdminChat';
 
 // HAPUS import kingdomsData dari JSON
 
@@ -384,6 +385,7 @@ const Dashboard = () => {
 
         </Content>
       </Layout>
+      <AdminChat user={user} />
     </Layout>
   );
 };
