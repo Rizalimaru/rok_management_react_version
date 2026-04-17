@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Row, Col, InputNumber, Divider, Progress, Tooltip, DatePicker } from 'antd';
+import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Row, Col, InputNumber, Divider, Progress, Tooltip, DatePicker, theme } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, MinusCircleOutlined, SendOutlined } from '@ant-design/icons';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const { Title, Text } = Typography;
@@ -13,6 +13,7 @@ const Orders = () => {
   const [customers, setCustomers] = useState([]);
   const [kingdoms, setKingdoms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { token } = theme.useToken();
 
   // State untuk Modal Utama (Add/Edit)
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -129,8 +130,18 @@ const Orders = () => {
     const newItems = [...activeOrder.items];
     const item = newItems[activeItemIndex];
 
-    item.amount_filled = parseNumber(item.amount_filled) + parseNumber(values.add_amount);
+    const amountAdded = parseNumber(values.add_amount);
+    item.amount_filled = parseNumber(item.amount_filled) + amountAdded;
     item.is_completed = item.amount_filled >= parseNumber(item.amount) ? 1 : 0;
+
+    if (!item.logs) item.logs = [];
+    const newLog = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2),
+      amount: amountAdded,
+      admin_email: auth.currentUser?.email || 'Unknown Admin',
+      timestamp: new Date().toISOString()
+    };
+    item.logs.push(newLog);
 
     try {
       await updateDoc(doc(db, 'orders', activeOrder.id), {
@@ -142,6 +153,38 @@ const Orders = () => {
       progressForm.resetFields();
     } catch (error) {
       message.error('Gagal memperbarui progress');
+    }
+  };
+
+  // --- FUNGSI UNDO HISTORY PROGRESS ---
+  const handleUndoProgress = async (order, itemIdx, logId) => {
+    if (!navigator.onLine) {
+      message.warning('Koneksi internet terputus! Tidak dapat membatalkan saat offline.');
+      return;
+    }
+
+    const newItems = [...order.items];
+    const item = newItems[itemIdx];
+
+    const logIndex = item.logs?.findIndex(l => l.id === logId);
+    if (logIndex === -1 || logIndex === undefined) return;
+
+    const logAmount = item.logs[logIndex].amount;
+
+    item.amount_filled = parseNumber(item.amount_filled) - logAmount;
+    if (item.amount_filled < 0) item.amount_filled = 0;
+    item.is_completed = item.amount_filled >= parseNumber(item.amount) ? 1 : 0;
+
+    item.logs.splice(logIndex, 1);
+
+    try {
+      await updateDoc(doc(db, 'orders', order.id), {
+        items: newItems,
+        updated_at: serverTimestamp()
+      });
+      message.success('Riwayat berhasil dibatalkan (Undo)!');
+    } catch (error) {
+      message.error('Gagal membatalkan riwayat');
     }
   };
 
@@ -233,7 +276,7 @@ const Orders = () => {
   // --- FUNGSI RENDER UNTUK DROPDOWN/EXPANDABLE ROW (PROGRESS LIVE) ---
   const expandedRowRender = (record) => {
     return (
-      <div style={{ padding: '16px 24px', background: '#f5f5f5', borderRadius: '8px' }}>
+      <div style={{ padding: '16px 24px', background: token.colorFillQuaternary || '#f5f5f5', borderRadius: '8px' }}>
         <Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>Detail Progress Pengiriman (Live)</Title>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
           {record.items?.map((item, idx) => {
@@ -241,7 +284,7 @@ const Orders = () => {
             const isCompleted = item.amount_filled >= item.amount;
 
             return (
-              <div key={idx} style={{ flex: '1 1 300px', maxWidth: '400px', padding: '12px', background: '#fff', borderRadius: '8px', border: '1px solid #e9ecef', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div key={idx} style={{ flex: '1 1 300px', maxWidth: '400px', padding: '12px', background: token.colorBgContainer || '#fff', borderRadius: '8px', border: `1px solid ${token.colorBorderSecondary || '#e9ecef'}`, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                 <Row justify="space-between" align="middle" style={{ marginBottom: 8 }}>
                   <Col>
                     <Tag color="orange" style={{ fontWeight: 'bold' }}>{item.resource_type?.toUpperCase()}</Tag>
@@ -272,6 +315,25 @@ const Orders = () => {
                   status={percent >= 100 ? "success" : "active"}
                   strokeColor={percent >= 100 ? '#52c41a' : '#1890ff'}
                 />
+
+                {item.logs && item.logs.length > 0 && (
+                  <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: `1px dashed ${token.colorBorderSecondary || '#f0f0f0'}` }}>
+                    <Text type="secondary" style={{ fontSize: '11px', display: 'block', marginBottom: '8px' }}>Riwayat Pengiriman Terakhir:</Text>
+                    {item.logs.slice().reverse().slice(0, 5).map(log => {
+                      const logDateStr = new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                      return (
+                        <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
+                          <Text type="secondary" style={{ fontSize: '11px' }}>
+                            <span style={{ color: '#52c41a', fontWeight: 'bold' }}>+{log.amount}M</span> oleh {log.admin_email?.split('@')[0]} ({logDateStr})
+                          </Text>
+                          <Popconfirm title="Undo riwayat ini?" onConfirm={() => handleUndoProgress(record, idx, log.id)} placement="left">
+                            <Button type="link" danger size="small" style={{ padding: 0, height: 'auto', fontSize: '11px' }}>Undo</Button>
+                          </Popconfirm>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}

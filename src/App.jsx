@@ -1,4 +1,7 @@
+import React, { useContext } from 'react';
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import { ConfigProvider, theme } from 'antd';
+import { ThemeContext } from './context/ThemeContext';
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 // Pastikan semua halaman di-import
@@ -9,8 +12,11 @@ import Customers from "./pages/Customers";
 import Orders from "./pages/Order";
 
 function App() {
+  const { isDarkMode } = useContext(ThemeContext);
+
   return (
-    <Router>
+    <ConfigProvider theme={{ algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+      <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -33,6 +39,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+    </ConfigProvider>
   );
 }
 

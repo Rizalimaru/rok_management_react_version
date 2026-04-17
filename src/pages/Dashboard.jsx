@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { Layout, Menu, Button, Typography, Dropdown, Avatar, theme, message, Card, Row, Col, Statistic, Space } from 'antd';
+import { Layout, Menu, Button, Typography, Dropdown, Avatar, theme, message, Card, Row, Col, Statistic, Space, Switch } from 'antd';
 import { 
   MenuFoldOutlined, 
   MenuUnfoldOutlined, 
@@ -18,6 +18,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '../config/firebase'; 
 import { collection, onSnapshot } from 'firebase/firestore';
 import AdminChat from '../components/AdminChat';
+import { ThemeContext } from '../context/ThemeContext';
 
 // HAPUS import kingdomsData dari JSON
 
@@ -27,6 +28,7 @@ const { Title, Text } = Typography;
 const Dashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState(null);
+  const { isDarkMode, toggleTheme } = useContext(ThemeContext);
   
   // State untuk menyimpan semua data statistik
   const [stats, setStats] = useState({ 
@@ -246,15 +248,23 @@ const Dashboard = () => {
             style={{ fontSize: '16px', width: 64, height: 64, marginLeft: '-24px' }}
           />
 
-          <Dropdown menu={profileMenu} placement="bottomRight" arrow>
-            <Space align="center" style={{ cursor: 'pointer', gap: '8px' }}>
-              <div style={{ textAlign: 'right', display: collapsed ? 'none' : 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 140 }}>
-                <Text strong style={{ display: 'block', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>Admin</Text>
-                <Text type="secondary" style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{user.email}</Text>
-              </div>
-              <Avatar style={{ backgroundColor: '#d1a054' }} icon={<UserOutlined />} />
-            </Space>
-          </Dropdown>
+          <Space size="large" align="center">
+            <Switch 
+              checked={isDarkMode} 
+              onChange={toggleTheme} 
+              checkedChildren="🌙" 
+              unCheckedChildren="☀️" 
+            />
+            <Dropdown menu={profileMenu} placement="bottomRight" arrow>
+              <Space align="center" style={{ cursor: 'pointer', gap: '8px' }}>
+                <div style={{ textAlign: 'right', display: collapsed ? 'none' : 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 140 }}>
+                  <Text strong style={{ display: 'block', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>Admin</Text>
+                  <Text type="secondary" style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{user.email}</Text>
+                </div>
+                <Avatar style={{ backgroundColor: '#d1a054' }} icon={<UserOutlined />} />
+              </Space>
+            </Dropdown>
+          </Space>
         </Header>
 
         {/* KONTEN DINAMIS / HALAMAN */}

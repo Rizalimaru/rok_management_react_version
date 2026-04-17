@@ -13,7 +13,13 @@ const AdminChat = ({ user }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef(null);
   const isInitialLoadRef = useRef(true);
+  const isOpenRef = useRef(isOpen);
   const { token } = theme.useToken();
+
+  // Selalu update ref setiap isOpen berubah
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Load last read timestamp from local storage
   const getLastReadTime = () => {
@@ -61,7 +67,7 @@ const AdminChat = ({ user }) => {
       setMessages(msgs);
 
       // Hitung unread (jika chat tidak terbuka)
-      if (!isOpen) {
+      if (!isOpenRef.current) {
         const lastRead = getLastReadTime();
         let unread = 0;
         msgs.forEach(m => {
@@ -81,8 +87,8 @@ const AdminChat = ({ user }) => {
             // Cek apakah pesan berasal dari orang lain
             if (docData.senderEmail !== user?.email) {
               playNotificationSound();
-              // Jangan tampilkan notifikasi browser jika chat window sedang terbuka dan tab aktif (tapi bisa disesuaikan, untuk amannya kita tampilkan jika chat ditutup ATAU kalau document hidden)
-              if (!isOpen || document.hidden) {
+              // Jangan tampilkan notifikasi browser jika chat window sedang terbuka dan tab aktif
+              if (!isOpenRef.current || document.hidden) {
                 showBrowserNotification(docData);
               }
             }
@@ -95,7 +101,7 @@ const AdminChat = ({ user }) => {
     });
 
     return () => unsubscribe();
-  }, [isOpen, user]); // tambah user ke dependency
+  }, [user?.email]); // <-- hapus isOpen dari dependency agar onSnapshot tidak direstart
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -210,7 +216,7 @@ const AdminChat = ({ user }) => {
     messageBubble: (isMine) => ({
       padding: '6px 12px',
       borderRadius: '12px',
-      backgroundColor: isMine ? (token.colorPrimary || '#1677ff') : '#fff',
+      backgroundColor: isMine ? (token.colorPrimary || '#1677ff') : (token.colorBgContainer || '#fff'),
       color: isMine ? '#fff' : (token.colorText || '#000'),
       width: 'fit-content',
       border: isMine ? 'none' : `1px solid ${token.colorBorderSecondary || '#f0f0f0'}`,
