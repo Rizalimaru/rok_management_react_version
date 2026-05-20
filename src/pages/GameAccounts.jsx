@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput } from 'antd';
+import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -13,6 +13,13 @@ const { Search } = AntInput;
 const GameAccounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // State untuk Modal Form
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -102,7 +109,7 @@ const GameAccounts = () => {
   };
 
   // Definisi kolom tabel
-  const columns = [
+  const desktopColumns = [
     {
       title: 'Email Akun',
       dataIndex: 'email',
@@ -172,6 +179,44 @@ const GameAccounts = () => {
     },
   ];
 
+  const mobileColumns = [
+    {
+      title: 'Data Akun Game',
+      key: 'mobile_data',
+      render: (_, record) => {
+        let color = record.status === 'active' ? 'green' : record.status === 'banned' ? 'red' : record.status === 'resting' ? 'orange' : 'default';
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <Text strong style={{ fontSize: '15px', wordBreak: 'break-all' }}>{record.email || '-'}</Text>
+               <Tag color={color} style={{ margin: 0, marginLeft: '8px' }}>{record.status?.toUpperCase() || 'UNKNOWN'}</Tag>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '4px' }}>
+               <Text type="secondary">Password:</Text>
+               <Text copyable={{ text: record.password }}>{record.password || '-'}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Login via:</Text>
+               <Text style={{ textTransform: 'capitalize' }}>{record.login_method || '-'}</Text>
+            </div>
+            
+            <Divider style={{ margin: '12px 0 8px 0' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => showEditModal(record)}>Edit</Button>
+              <Popconfirm title="Hapus Akun?" onConfirm={() => handleDelete(record.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />}>Hapus</Button>
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const columns = isMobile ? mobileColumns : desktopColumns;
+
   // Logika untuk Global Search (Mencari berdasarkan Email atau Catatan/Notes)
   const filteredAccounts = accounts.filter((acc) => {
     const searchLower = searchText.toLowerCase();
@@ -200,13 +245,14 @@ const GameAccounts = () => {
         </Space>
       </div>
 
-      <Card>
+      <Card styles={{ body: { padding: 0 } }}>
         <Table 
           columns={columns} 
           dataSource={filteredAccounts} 
           rowKey="id" 
           loading={loading}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: isMobile ? undefined : 800 }}
         />
       </Card>
 

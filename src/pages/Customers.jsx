@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Button, Space, Modal, Form, Input, message, Popconfirm, Input as AntInput } from 'antd';
+import { Table, Typography, Card, Button, Space, Modal, Form, Input, message, Popconfirm, Input as AntInput, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = AntInput;
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // State untuk Modal Form
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -111,7 +118,7 @@ const Customers = () => {
   };
 
   // Definisi kolom tabel
-  const columns = [
+  const desktopColumns = [
     {
       title: 'Nama Pelanggan',
       dataIndex: 'name',
@@ -169,6 +176,50 @@ const Customers = () => {
     },
   ];
 
+  const mobileColumns = [
+    {
+      title: 'Data Pelanggan',
+      key: 'mobile_data',
+      render: (_, record) => {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <Text strong style={{ fontSize: '15px' }}>{record.name || '-'}</Text>
+               <Button 
+                 type="primary" 
+                 ghost
+                 icon={<WhatsAppOutlined style={{ color: '#25D366' }} />} 
+                 href={formatWhatsAppLink(record.whatsapp)}
+                 target="_blank"
+                 title="Chat via WhatsApp"
+                 size="small"
+                 style={{ borderColor: '#25D366', color: '#25D366' }}
+               >
+                 Chat
+               </Button>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '4px' }}>
+               <Text type="secondary">WhatsApp:</Text>
+               <Text>{record.whatsapp || '-'}</Text>
+            </div>
+            
+            <Divider style={{ margin: '12px 0 8px 0' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => showEditModal(record)}>Edit</Button>
+              <Popconfirm title="Hapus Pelanggan?" onConfirm={() => handleDelete(record.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />}>Hapus</Button>
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const columns = isMobile ? mobileColumns : desktopColumns;
+
   // Logika Pencarian (Mencari berdasarkan Nama atau WhatsApp)
   const filteredCustomers = customers.filter((cust) => {
     const searchLower = searchText.toLowerCase();
@@ -197,13 +248,14 @@ const Customers = () => {
         </Space>
       </div>
 
-      <Card styles={{ body: { padding: 0, overflowX: 'auto' } }}>
+      <Card styles={{ body: { padding: 0 } }}>
         <Table 
           columns={columns} 
           dataSource={filteredCustomers} 
           rowKey="id" 
           loading={loading}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: isMobile ? undefined : 600 }}
         />
       </Card>
 

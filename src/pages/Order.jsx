@@ -14,6 +14,13 @@ const Orders = () => {
   const [kingdoms, setKingdoms] = useState([]);
   const [loading, setLoading] = useState(true);
   const { token } = theme.useToken();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // State untuk Modal Utama (Add/Edit)
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -222,22 +229,32 @@ const Orders = () => {
   });
 
   // --- KOLOM TABEL UTAMA ---
-  const columns = [
+  const desktopColumns = [
     {
       title: 'Invoice / Pelanggan',
       key: 'customer',
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{record.order_number || record.id}</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            {customers.find(c => String(c.id) === String(record.customer_id))?.name || 'Unknown Customer'}
-          </Text>
-        </Space>
-      )
+      render: (_, record) => {
+        let dateStr = '-';
+        if (record.created_at) {
+          const dt = record.created_at.toDate ? record.created_at.toDate() : new Date(record.created_at);
+          dateStr = dt.toLocaleString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+        return (
+          <Space orientation="vertical" size={0}>
+            <Text strong>{record.order_number || record.id}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {customers.find(c => String(c.id) === String(record.customer_id))?.name || 'Unknown Customer'}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '11px' }}>{dateStr}</Text>
+          </Space>
+        );
+      }
     },
     {
       title: 'Kingdom',
       key: 'kingdom',
+      filters: kingdoms.map(k => ({ text: `Server ${k.server_number || k.name}`, value: k.id })),
+      onFilter: (value, record) => record.kingdom_id === value,
       render: (_, record) => {
         const kd = kingdoms.find(k => String(k.id) === String(record.kingdom_id));
         return kd ? `Server ${kd.server_number}` : '-';
@@ -272,6 +289,60 @@ const Orders = () => {
       )
     }
   ];
+
+  const mobileColumns = [
+    {
+      title: 'Data Pesanan',
+      key: 'mobile_data',
+      render: (_, record) => {
+        const customerName = customers.find(c => String(c.id) === String(record.customer_id))?.name || 'Unknown Customer';
+        const kd = kingdoms.find(k => String(k.id) === String(record.kingdom_id));
+        const kingdomName = kd ? `Server ${kd.server_number}` : '-';
+        let dateStr = '-';
+        if (record.created_at) {
+          const dt = record.created_at.toDate ? record.created_at.toDate() : new Date(record.created_at);
+          dateStr = dt.toLocaleString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+        const colors = { completed: 'green', processing: 'blue', pending: 'orange', cancelled: 'red' };
+        
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <div>
+                 <Text strong style={{ display: 'block', fontSize: '15px' }}>{record.order_number || record.id}</Text>
+                 <Text type="secondary" style={{ fontSize: '13px' }}>{customerName}</Text>
+               </div>
+               <Tag color={colors[record.status] || 'default'} style={{ margin: 0 }}>{record.status?.toUpperCase()}</Tag>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '8px' }}>
+               <Text type="secondary">Kingdom:</Text>
+               <Text strong>{kingdomName}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Tanggal:</Text>
+               <Text>{dateStr}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Total Harga:</Text>
+               <Text strong style={{ color: '#52c41a' }}>Rp {Number(record.total_price || 0).toLocaleString('id-ID')}</Text>
+            </div>
+            
+            <Divider style={{ margin: '12px 0 8px 0' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => showEditModal(record)}>Edit</Button>
+              <Popconfirm title="Hapus pesanan ini?" onConfirm={() => handleDeleteOrder(record.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />}>Hapus</Button>
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const columns = isMobile ? mobileColumns : desktopColumns;
 
   // --- FUNGSI RENDER UNTUK DROPDOWN/EXPANDABLE ROW (PROGRESS LIVE) ---
   const expandedRowRender = (record) => {
@@ -372,7 +443,7 @@ const Orders = () => {
           dataSource={filteredOrders}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 800 }}
+          scroll={{ x: isMobile ? undefined : 800 }}
           pagination={{ pageSize: 10 }}
           expandable={{
             expandedRowRender,
@@ -391,12 +462,12 @@ const Orders = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleFinish}>
           <Row gutter={16}>
-            <Col span={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item name="order_number" label="Nomor Invoice" rules={[{ required: true }]}>
                 <Input readOnly style={{ backgroundColor: '#f5f5f5', color: '#595959' }} />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item name="customer_id" label="Pelanggan" rules={[{ required: true }]}>
                 <Select
                   showSearch
@@ -408,7 +479,7 @@ const Orders = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item name="kingdom_id" label="Kingdom" rules={[{ required: true }]}>
                 <Select
                   showSearch
@@ -420,7 +491,7 @@ const Orders = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={6}><Form.Item name="status" label="Status Global" rules={[{ required: true }]}><Select><Option value="pending">Pending</Option><Option value="processing">Processing</Option><Option value="completed">Completed</Option></Select></Form.Item></Col>
+            <Col xs={24} sm={12} md={6}><Form.Item name="status" label="Status Global" rules={[{ required: true }]}><Select><Option value="pending">Pending</Option><Option value="processing">Processing</Option><Option value="completed">Completed</Option></Select></Form.Item></Col>
           </Row>
 
           <Divider orientation="left">Detail Resource (Items)</Divider>
@@ -431,14 +502,14 @@ const Orders = () => {
                 {fields.map(({ key, name, ...restField }) => (
                   <Card size="small" key={key} style={{ marginBottom: 12, background: '#fafafa' }}>
                     <Row gutter={16} align="middle">
-                      <Col span={10}>
+                      <Col xs={24} sm={10}>
                         <Form.Item {...restField} name={[name, 'amount_filled']} hidden><Input /></Form.Item>
                         <Form.Item {...restField} name={[name, 'is_completed']} hidden><Input /></Form.Item>
                         <Form.Item {...restField} name={[name, 'resource_type']} label="Jenis Resource" rules={[{ required: true }]}>
                           <Select><Option value="food">Food</Option><Option value="wood">Wood</Option><Option value="stone">Stone</Option><Option value="gold">Gold</Option></Select>
                         </Form.Item>
                       </Col>
-                      <Col span={10}>
+                      <Col xs={24} sm={10}>
                         <Form.Item {...restField} name={[name, 'amount']} label="Jumlah Target (M)" rules={[{ required: true }]}>
                           <InputNumber
                             style={{ width: '100%' }}
@@ -448,7 +519,7 @@ const Orders = () => {
                           />
                         </Form.Item>
                       </Col>
-                      <Col span={4} style={{ textAlign: 'center' }}>
+                      <Col xs={24} sm={4} style={{ textAlign: 'center' }}>
                         <Button type="text" danger onClick={() => remove(name)} icon={<MinusCircleOutlined />} style={{ marginTop: 24 }}>Hapus</Button>
                       </Col>
                     </Row>
@@ -461,7 +532,7 @@ const Orders = () => {
 
           <Divider />
           <Row gutter={16} justify="end">
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="total_price" label="Total Harga Keseluruhan (Rp)">
                 {/* UPDATE DI SINI: Menambahkan prop parser agar ketikan manual bisa dibaca sistem */}
                 <InputNumber

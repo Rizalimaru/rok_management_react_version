@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Button, Space, Modal, Form, Input, message, Popconfirm, Input as AntInput } from 'antd';
+import { Table, Typography, Card, Button, Space, Modal, Form, Input, message, Popconfirm, Input as AntInput, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase'; 
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = AntInput;
 
 const Kingdoms = () => {
   const [kingdoms, setKingdoms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // State untuk Modal Form
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -101,7 +108,7 @@ const Kingdoms = () => {
   };
 
   // Definisi kolom tabel (Lebih simpel)
-  const columns = [
+  const desktopColumns = [
     {
       title: 'Server Number',
       dataIndex: 'server_number',
@@ -141,6 +148,38 @@ const Kingdoms = () => {
     },
   ];
 
+  const mobileColumns = [
+    {
+      title: 'Data Kingdom',
+      key: 'mobile_data',
+      render: (_, record) => {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <Text strong style={{ fontSize: '15px' }}>Server {record.server_number || '-'}</Text>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '4px' }}>
+               <Text type="secondary">Nama Kingdom:</Text>
+               <Text>{record.name || `Kingdom ${record.server_number}`}</Text>
+            </div>
+            
+            <Divider style={{ margin: '12px 0 8px 0' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => showEditModal(record)}>Edit</Button>
+              <Popconfirm title="Hapus Kingdom?" onConfirm={() => handleDelete(record.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />}>Hapus</Button>
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const columns = isMobile ? mobileColumns : desktopColumns;
+
   // Logika Pencarian (Mencari berdasarkan Server Number atau Nama Kingdom)
   const filteredKingdoms = kingdoms.filter((kd) => {
     const searchLower = searchText.toLowerCase();
@@ -169,13 +208,14 @@ const Kingdoms = () => {
         </Space>
       </div>
 
-      <Card>
+      <Card styles={{ body: { padding: 0 } }}>
         <Table 
           columns={columns} 
           dataSource={filteredKingdoms} 
           rowKey="id" 
           loading={loading}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: isMobile ? undefined : 500 }}
         />
       </Card>
 

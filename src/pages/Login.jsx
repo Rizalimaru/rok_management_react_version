@@ -106,6 +106,12 @@ const Login = () => {
         <div style={{ width: '100%', maxWidth: '400px', padding: '24px' }}>
           
           <div style={{ marginBottom: '32px' }}>
+            {/* Tampilkan Logo di Atas Form (terutama penting untuk tampilan Mobile) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+              <div style={{ width: 28, height: 28, background: '#101828', borderRadius: 6 }}></div>
+              <Title level={3} style={{ color: '#101828', margin: 0 }}>RoK Portal</Title>
+            </div>
+
             <Title level={2} style={{ margin: '0 0 8px 0', color: '#101828' }}>
               Welcome back
             </Title>

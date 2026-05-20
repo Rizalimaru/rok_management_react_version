@@ -1,31 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput, Row, Col } from 'antd';
+import { Table, Typography, Card, Tag, Button, Space, Modal, Form, Input, Select, message, Popconfirm, Input as AntInput, Row, Col, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { db } from '../config/firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const { Search } = AntInput; 
+const { Search } = AntInput;
 
 const formatNumber = (num) => {
-  if (!num) return '0';
+  if (!num) return '0M';
   const n = Number(num);
   if (n >= 1000000) {
-    return parseFloat((n / 1000000).toFixed(2)) + 'M';
+    return parseFloat((n / 1000000).toFixed(2)) + 'T';
   }
   if (n >= 1000) {
-    return parseFloat((n / 1000).toFixed(2)) + 'K';
+    return parseFloat((n / 1000).toFixed(2)) + 'B';
   }
-  return n.toLocaleString('id-ID');
+  return parseFloat(n.toFixed(2)) + 'M';
 };
 
 const Characters = () => {
   const [characters, setCharacters] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  const [kingdoms, setKingdoms] = useState([]); 
+  const [kingdoms, setKingdoms] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -35,7 +42,7 @@ const Characters = () => {
   const [resourceEditingId, setResourceEditingId] = useState(null);
   const [resourceFormLoading, setResourceFormLoading] = useState(false);
   const [resourceForm] = Form.useForm();
-  
+
   const [searchText, setSearchText] = useState('');
 
   // FETCH DATA DARI FIREBASE SECARA REAL-TIME 
@@ -48,10 +55,10 @@ const Characters = () => {
     // Fetch Kingdoms & URUTKAN DARI TERKECIL KE TERBESAR
     const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
       let fetchedKingdoms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+
       // Proses pengurutan berdasarkan angka server_number
       fetchedKingdoms.sort((a, b) => Number(a.server_number || 0) - Number(b.server_number || 0));
-      
+
       setKingdoms(fetchedKingdoms);
     });
 
@@ -60,17 +67,17 @@ const Characters = () => {
       const charsData = snapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
-        ign: docSnap.data().name || '-', 
+        ign: docSnap.data().name || '-',
         resources: docSnap.data().resources || { food: 0, wood: 0, stone: 0, gold: 0 }
       }));
       setCharacters(charsData);
       setLoading(false);
     });
 
-    return () => { 
-      unsubAccounts(); 
-      unsubKingdoms(); 
-      unsubChars(); 
+    return () => {
+      unsubAccounts();
+      unsubKingdoms();
+      unsubChars();
     };
   }, []);
 
@@ -185,7 +192,7 @@ const Characters = () => {
 
   const kingdomFilters = kingdoms.map(k => ({ text: k.server_number || k.name, value: k.id }));
 
-  const columns = [
+  const desktopColumns = [
     { title: 'IGN', dataIndex: 'ign', key: 'ign', render: (ign) => ign || '-' },
     {
       title: 'Akun Game', dataIndex: 'game_account_id', key: 'game_account_id',
@@ -195,9 +202,9 @@ const Characters = () => {
       }
     },
     {
-      title: 'Kingdom', width: 120, align: 'center', dataIndex: 'kingdom_id', key: 'kingdom_id', 
+      title: 'Kingdom', width: 120, align: 'center', dataIndex: 'kingdom_id', key: 'kingdom_id',
       render: (id) => getKingdomName(id),
-      filters: kingdomFilters, 
+      filters: kingdomFilters,
       onFilter: (value, record) => record.kingdom_id === value,
     },
     { title: 'Food 🌽', dataIndex: ['resources', 'food'], width: 100, align: 'center', render: (val) => formatNumber(val) },
@@ -228,6 +235,67 @@ const Characters = () => {
     },
   ];
 
+  const mobileColumns = [
+    {
+      title: 'Data Karakter',
+      key: 'mobile_data',
+      render: (_, record) => {
+        const acc = accounts.find(a => String(a.id) === String(record.game_account_id));
+        const accName = acc ? (acc.email || acc.username || acc.id) : '-';
+        const kName = getKingdomName(record.kingdom_id);
+        const status = record.status;
+        let color = status === 'ready' ? 'green' : status === 'banned' ? 'red' : 'default';
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+               <div>
+                 <Text strong style={{ display: 'block', fontSize: '15px' }}>{record.ign || '-'}</Text>
+                 <Text type="secondary" style={{ fontSize: '13px' }}>{accName}</Text>
+               </div>
+               <Tag color={color} style={{ margin: 0 }}>{status?.toUpperCase() || '-'}</Tag>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '8px' }}>
+               <Text type="secondary">Kingdom:</Text>
+               <Text strong>{kName}</Text>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '4px' }}>
+               <Text type="secondary">Food 🌽:</Text>
+               <Text>{formatNumber(record.resources?.food)}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Wood 🪵:</Text>
+               <Text>{formatNumber(record.resources?.wood)}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Stone 🪨:</Text>
+               <Text>{formatNumber(record.resources?.stone)}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+               <Text type="secondary">Gold 🪙:</Text>
+               <Text>{formatNumber(record.resources?.gold)}</Text>
+            </div>
+            
+            <Divider style={{ margin: '12px 0 8px 0' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button size="small" icon={<CopyOutlined />} onClick={() => copyToClipboard(record.ign)} />
+              <Button size="small" style={{ color: '#52c41a', borderColor: '#52c41a' }} icon={<DatabaseOutlined />} onClick={() => showResourceModal(record)} />
+              <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => showEditModal(record)} />
+              <Popconfirm title="Hapus Karakter?" onConfirm={() => handleDelete(record.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const columns = isMobile ? mobileColumns : desktopColumns;
+
   const filteredCharacters = characters.filter((char) => {
     const searchLower = searchText.toLowerCase();
     const ignMatch = (char.ign || '').toLowerCase().includes(searchLower);
@@ -249,23 +317,23 @@ const Characters = () => {
       </div>
 
       <Card styles={{ body: { padding: 0, overflowX: 'auto' } }}>
-        <Table columns={columns} dataSource={filteredCharacters} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 1300 }} />
+        <Table columns={columns} dataSource={filteredCharacters} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: isMobile ? undefined : 1300 }} />
       </Card>
-      
+
       <Modal title={editingId ? 'Edit Profil Character' : 'Tambah Character Baru'} open={isModalVisible} onCancel={handleCancel} footer={null} width={600}>
         <Form form={form} layout="vertical" onFinish={handleFinish} style={{ marginTop: '20px' }}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="name" label="IGN (In Game Name)" rules={[{ required: true }]}>
                 <Input placeholder="Masukkan IGN karakter" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="game_account_id" label="Akun Game (Relasi)" rules={[{ required: true }]}>
                 {/* === PENAMBAHAN FITUR SEARCH === 
                   Menambahkan properti showSearch, optionFilterProp, dan filterOption 
                 */}
-                <Select 
+                <Select
                   showSearch
                   placeholder="Pilih akun game / Cari Email"
                   optionFilterProp="children"
@@ -280,10 +348,10 @@ const Characters = () => {
           </Row>
 
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="kingdom_id" label="Kingdom" rules={[{ required: true }]}>
                 {/* Menambahkan search juga untuk dropdown Kingdom sekalian agar lebih praktis */}
-                <Select 
+                <Select
                   showSearch
                   placeholder="Pilih kingdom / Server"
                   optionFilterProp="children"
@@ -295,7 +363,7 @@ const Characters = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                 <Select placeholder="Pilih status"><Option value="ready">Ready</Option><Option value="banned">Banned</Option></Select>
               </Form.Item>
@@ -308,12 +376,12 @@ const Characters = () => {
 
           <Card size="small" title="Data Resources" style={{ marginBottom: '24px', background: '#fafafa' }}>
             <Row gutter={16}>
-              <Col span={12}><Form.Item name={['resources', 'food']} label="Food 🌽" initialValue={0}><Input type="number" /></Form.Item></Col>
-              <Col span={12}><Form.Item name={['resources', 'wood']} label="Wood 🪵" initialValue={0}><Input type="number" /></Form.Item></Col>
+              <Col xs={24} sm={12}><Form.Item name={['resources', 'food']} label="Food 🌽" initialValue={0}><Input type="number" /></Form.Item></Col>
+              <Col xs={24} sm={12}><Form.Item name={['resources', 'wood']} label="Wood 🪵" initialValue={0}><Input type="number" /></Form.Item></Col>
             </Row>
             <Row gutter={16}>
-              <Col span={12}><Form.Item name={['resources', 'stone']} label="Stone 🪨" initialValue={0}><Input type="number" /></Form.Item></Col>
-              <Col span={12}><Form.Item name={['resources', 'gold']} label="Gold 🪙" initialValue={0}><Input type="number" /></Form.Item></Col>
+              <Col xs={24} sm={12}><Form.Item name={['resources', 'stone']} label="Stone 🪨" initialValue={0}><Input type="number" /></Form.Item></Col>
+              <Col xs={24} sm={12}><Form.Item name={['resources', 'gold']} label="Gold 🪙" initialValue={0}><Input type="number" /></Form.Item></Col>
             </Row>
           </Card>
 
@@ -328,15 +396,15 @@ const Characters = () => {
         </Form>
       </Modal>
 
-      <Modal title={<span style={{ color: '#52c41a' }}><DatabaseOutlined style={{ marginRight: '8px' }}/>Update Resources</span>} open={isResourceModalVisible} onCancel={handleResourceCancel} footer={null} width={400}>
+      <Modal title={<span style={{ color: '#52c41a' }}><DatabaseOutlined style={{ marginRight: '8px' }} />Update Resources</span>} open={isResourceModalVisible} onCancel={handleResourceCancel} footer={null} width={400}>
         <Form form={resourceForm} layout="vertical" onFinish={handleResourceFinish} style={{ marginTop: '20px' }}>
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="food" label="Food 🌽" initialValue={0}><Input type="number" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="wood" label="Wood 🪵" initialValue={0}><Input type="number" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="food" label="Food 🌽" initialValue={0}><Input type="number" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="wood" label="Wood 🪵" initialValue={0}><Input type="number" /></Form.Item></Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="stone" label="Stone 🪨" initialValue={0}><Input type="number" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="gold" label="Gold 🪙" initialValue={0}><Input type="number" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="stone" label="Stone 🪨" initialValue={0}><Input type="number" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="gold" label="Gold 🪙" initialValue={0}><Input type="number" /></Form.Item></Col>
           </Row>
           <Form.Item style={{ textAlign: 'right', marginBottom: 0, marginTop: '16px' }}>
             <Space>

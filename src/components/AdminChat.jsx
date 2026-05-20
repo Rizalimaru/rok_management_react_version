@@ -235,7 +235,7 @@ const AdminChat = ({ user }) => {
         onClick={toggleChat}
         className="admin-chat-trigger"
       >
-        <Badge count={unreadCount} overflowCount={99} offset={[-5, 5]} size="default">
+        <Badge count={unreadCount} overflowCount={99} offset={[-5, 5]} size="medium">
           <div style={{
             width: '100%', height: '100%', display: 'flex',
             justifyContent: 'center', alignItems: 'center', color: '#fff'
@@ -308,7 +308,7 @@ const AdminChat = ({ user }) => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onPressEnter={handleSendMessage}
-            bordered={false}
+            variant="borderless"
             style={{ backgroundColor: token.colorBgLayout || '#f5f5f5', borderRadius: '20px', padding: '8px 16px' }}
           />
           <Button
