@@ -10,6 +10,7 @@ import Characters from "./pages/Characters";
 import Kingdoms from "./pages/Kingdoms";
 import Customers from "./pages/Customers";
 import Orders from "./pages/Order";
+import Reports from "./pages/Reports";
 
 function App() {
   const { isDarkMode } = useContext(ThemeContext);
@@ -36,6 +37,7 @@ function App() {
           <Route path="kingdoms" element={<Kingdoms />} />
           <Route path="customers" element={<Customers />} />
           <Route path="orders" element={<Orders />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
       </Routes>
     </Router>

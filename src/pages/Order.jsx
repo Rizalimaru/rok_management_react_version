@@ -31,6 +31,8 @@ const Orders = () => {
   // State untuk Pencarian & Filter
   const [searchText, setSearchText] = useState('');
   const [filterMonth, setFilterMonth] = useState(null);
+  const [filterDate, setFilterDate] = useState(null);
+  const [filterAdmin, setFilterAdmin] = useState(null);
 
   // State untuk Update Progress Cepat
   const [isProgressModalVisible, setIsProgressModalVisible] = useState(false);
@@ -73,7 +75,7 @@ const Orders = () => {
   const showAddModal = () => {
     form.resetFields();
     const autoInvoice = `INV-${Date.now()}`;
-    form.setFieldsValue({ order_number: autoInvoice, status: 'pending' });
+    form.setFieldsValue({ order_number: autoInvoice, status: 'pending', admin_email: auth.currentUser?.email });
     setEditingId(null);
     setIsModalVisible(true);
   };
@@ -93,6 +95,9 @@ const Orders = () => {
 
     setFormLoading(true);
     try {
+      const oldOrder = editingId ? orders.find(o => o.id === editingId) : null;
+      const isNewlyCompleted = values.status === 'completed' && (!oldOrder || oldOrder.status !== 'completed');
+
       const payload = {
         ...values,
         total_price: parseNumber(values.total_price),
@@ -109,12 +114,19 @@ const Orders = () => {
         updated_at: serverTimestamp()
       };
 
+      if (isNewlyCompleted) {
+        payload.completed_at = serverTimestamp();
+      } else if (values.status === 'completed' && oldOrder?.completed_at) {
+        payload.completed_at = oldOrder.completed_at;
+      }
+
       if (editingId) {
         await updateDoc(doc(db, 'orders', editingId), payload);
         message.success('Pesanan berhasil diperbarui!');
       } else {
         await addDoc(collection(db, 'orders'), {
           ...payload,
+          admin_email: payload.admin_email || auth.currentUser?.email || 'Unknown Admin',
           created_at: serverTimestamp()
         });
         message.success('Pesanan baru berhasil dibuat!');
@@ -218,14 +230,29 @@ const Orders = () => {
 
     let matchMonth = true;
     if (filterMonth && o.created_at) {
-      const orderDate = o.created_at?.toDate ? o.created_at.toDate() : new Date();
+      const orderDate = o.created_at?.toDate ? o.created_at.toDate() : new Date(o.created_at || Date.now());
       const yyyy = orderDate.getFullYear();
       const mm = String(orderDate.getMonth() + 1).padStart(2, '0');
       const orderMonthStr = `${yyyy}-${mm}`;
       matchMonth = orderMonthStr === filterMonth;
     }
 
-    return matchText && matchMonth;
+    let matchDate = true;
+    if (filterDate && o.created_at) {
+      const orderDate = o.created_at?.toDate ? o.created_at.toDate() : new Date(o.created_at || Date.now());
+      const yyyy = orderDate.getFullYear();
+      const mm = String(orderDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(orderDate.getDate()).padStart(2, '0');
+      const orderDateStr = `${yyyy}-${mm}-${dd}`;
+      matchDate = orderDateStr === filterDate;
+    }
+
+    let matchAdmin = true;
+    if (filterAdmin) {
+      matchAdmin = o.admin_email === filterAdmin;
+    }
+
+    return matchText && matchMonth && matchDate && matchAdmin;
   });
 
   // --- KOLOM TABEL UTAMA ---
@@ -276,6 +303,12 @@ const Orders = () => {
       }
     },
     {
+      title: 'Admin',
+      dataIndex: 'admin_email',
+      key: 'admin_email',
+      render: (email) => email ? <Tag color="cyan">{email.split('@')[0]}</Tag> : '-'
+    },
+    {
       title: 'Aksi',
       key: 'action',
       align: 'center',
@@ -316,6 +349,10 @@ const Orders = () => {
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '8px' }}>
+               <Text type="secondary">Admin:</Text>
+               <Text>{record.admin_email ? record.admin_email.split('@')[0] : '-'}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                <Text type="secondary">Kingdom:</Text>
                <Text strong>{kingdomName}</Text>
             </div>
@@ -413,6 +450,8 @@ const Orders = () => {
     );
   };
 
+  const uniqueAdmins = [...new Set(orders.map(o => o.admin_email).filter(Boolean))];
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
@@ -425,6 +464,22 @@ const Orders = () => {
             onChange={(date, dateString) => setFilterMonth(dateString)}
             style={{ width: 140 }}
           />
+          <DatePicker
+            placeholder="Pilih Tanggal"
+            allowClear
+            onChange={(date, dateString) => setFilterDate(dateString)}
+            style={{ width: 140 }}
+          />
+          <Select
+            placeholder="Filter Admin"
+            allowClear
+            onChange={(value) => setFilterAdmin(value)}
+            style={{ width: 140 }}
+          >
+            {uniqueAdmins.map(admin => (
+              <Option key={admin} value={admin}>{admin.split('@')[0]}</Option>
+            ))}
+          </Select>
           <Search
             placeholder="Cari Invoice / Pelanggan..."
             allowClear
@@ -492,6 +547,11 @@ const Orders = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={6}><Form.Item name="status" label="Status Global" rules={[{ required: true }]}><Select><Option value="pending">Pending</Option><Option value="processing">Processing</Option><Option value="completed">Completed</Option></Select></Form.Item></Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="admin_email" label="Admin yang Mengerjakan (Handler)" rules={[{ required: true }]}>
+                <Input placeholder="Email admin" />
+              </Form.Item>
+            </Col>
           </Row>
 
           <Divider orientation="left">Detail Resource (Items)</Divider>
