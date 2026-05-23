@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { Layout, Menu, Button, Typography, Dropdown, Avatar, theme, message, Card, Row, Col, Statistic, Space, Switch, Progress, Tag, Drawer, Table } from 'antd';
+import { Layout, Menu, Button, Typography, Dropdown, Avatar, theme, message, Card, Row, Col, Statistic, Space, Switch, Progress, Tag, Drawer, Table, DatePicker, Select } from 'antd';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import dayjs from 'dayjs';
+const { RangePicker } = DatePicker;
+const { Option } = Select;
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -50,6 +54,12 @@ const Dashboard = () => {
     totalCharacters: 0
   });
 
+  // State untuk Filter Grafik
+  const [filterTimeRange, setFilterTimeRange] = useState('7d');
+  const [customDateRange, setCustomDateRange] = useState(null);
+  const [filterKingdom, setFilterKingdom] = useState('all');
+  const [filterAdmin, setFilterAdmin] = useState('all');
+
   const [characters, setCharacters] = useState([]);
   const [kingdoms, setKingdoms] = useState([]);
   const [ordersList, setOrdersList] = useState([]);
@@ -66,6 +76,11 @@ const Dashboard = () => {
     if (n >= 1000000) return parseFloat((n / 1000000).toFixed(2)) + 'M';
     if (n >= 1000) return parseFloat((n / 1000).toFixed(2)) + 'K';
     return n.toLocaleString('id-ID');
+  };
+
+  const formatRupiah = (num) => {
+    if (!num) return '0';
+    return Number(num).toLocaleString('id-ID');
   };
 
   const kingdomOverviews = useMemo(() => {
@@ -141,6 +156,66 @@ const Dashboard = () => {
 
     return Object.values(data);
   }, [characters, kingdoms, ordersList]);
+
+  // Daftar Admin Unik untuk Filter
+  const uniqueAdmins = useMemo(() => {
+    const admins = new Set();
+    ordersList.forEach(o => {
+      if (o.admin_email) admins.add(o.admin_email);
+    });
+    return Array.from(admins);
+  }, [ordersList]);
+
+  // Kalkulasi Data Grafik Pendapatan
+  const revenueData = useMemo(() => {
+    let filteredOrders = ordersList.filter(o => o.status === 'completed');
+
+    if (filterKingdom !== 'all') {
+      filteredOrders = filteredOrders.filter(o => String(o.kingdom_id) === String(filterKingdom));
+    }
+    if (filterAdmin !== 'all') {
+      filteredOrders = filteredOrders.filter(o => o.admin_email === filterAdmin);
+    }
+
+    const now = dayjs();
+    let startDate = null;
+    let endDate = now;
+
+    if (filterTimeRange === 'today') {
+      startDate = now.startOf('day');
+    } else if (filterTimeRange === '7d') {
+      startDate = now.subtract(7, 'day').startOf('day');
+    } else if (filterTimeRange === '30d') {
+      startDate = now.subtract(30, 'day').startOf('day');
+    } else if (filterTimeRange === 'custom' && customDateRange) {
+      startDate = customDateRange[0].startOf('day');
+      endDate = customDateRange[1].endOf('day');
+    }
+
+    if (startDate && filterTimeRange !== 'all') {
+      filteredOrders = filteredOrders.filter(o => {
+        const orderDate = o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : (o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : null);
+        if (!orderDate) return false;
+        return orderDate.isAfter(startDate) && orderDate.isBefore(endDate);
+      });
+    }
+
+    const grouped = {};
+    filteredOrders.forEach(o => {
+      const orderDate = o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : (o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : dayjs());
+      const dateStr = orderDate.format('DD MMM YYYY');
+      
+      if (!grouped[dateStr]) {
+        grouped[dateStr] = { date: dateStr, timestamp: orderDate.startOf('day').valueOf(), total: 0 };
+      }
+      grouped[dateStr].total += Number(o.total_price || 0);
+    });
+
+    const chartData = Object.values(grouped).sort((a, b) => a.timestamp - b.timestamp);
+    const totalRevenue = chartData.reduce((sum, item) => sum + item.total, 0);
+
+    return { chartData, totalRevenue };
+  }, [ordersList, filterTimeRange, customDateRange, filterKingdom, filterAdmin]);
 
   // Kolom Tabel Taksiran Stok
   const stockColumns = [
@@ -433,90 +508,74 @@ const Dashboard = () => {
               </div>
 
               <div style={{ padding: '0 24px' }}>
-                <Row gutter={[24, 24]} style={{ marginBottom: '32px' }}>
-                  {/* WIDGET 1: Performa Keuangan & Pesanan */}
-                  <Col xs={24} lg={8}>
-                    <Card className="overlapping-card" styles={{ body: { padding: '24px' } }}>
-                      <Title level={5} style={{ marginBottom: 24, borderBottom: '1px solid #f0f0f0', paddingBottom: 12 }}>Performa Keuangan</Title>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1, textAlign: 'center' }}>
-                          <Progress 
-                            type="circle" 
-                            percent={stats.totalOrdersThisMonth > 0 ? Math.round((stats.completedOrdersThisMonth / stats.totalOrdersThisMonth) * 100) : 0} 
-                            strokeColor="#52c41a"
-                            size={120}
-                            format={percent => <span style={{ fontSize: '24px', fontWeight: 'bold' }}>{percent}%</span>}
-                          />
-                          <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>Selesai (Bulan Ini)</Text>
-                        </div>
-                        <div style={{ flex: 1, paddingLeft: 16 }}>
-                          <Text type="secondary">Omset Bulan Ini</Text>
-                          <Title level={3} style={{ marginTop: 0, marginBottom: 16, color: '#1677ff' }}>
-                            Rp {formatNumber(stats.income)}
-                          </Title>
-                          
-                          <Space direction="vertical" size={2}>
-                            <Text type="secondary"><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#52c41a', marginRight: 8 }}></span>Completed: {stats.completedOrdersThisMonth}</Text>
-                            <Text type="secondary"><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ff4d4f', marginRight: 8 }}></span>Pending: {stats.pendingOrders}</Text>
-                          </Space>
-                        </div>
-                      </div>
-                    </Card>
-                  </Col>
+                {/* GRAFIK PENDAPATAN & FILTER */}
+                <Card className="overlapping-card" style={{ marginBottom: 32 }} styles={{ body: { padding: '24px' } }}>
+                  <Row justify="space-between" align="middle" style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #f0f0f0' }}>
+                    <Col xs={24} lg={10} style={{ marginBottom: isMobile ? 16 : 0 }}>
+                      <Title level={4} style={{ margin: 0 }}>Grafik Pendapatan Keseluruhan</Title>
+                      <Text type="secondary">Total Pendapatan: <strong style={{ color: '#52c41a', fontSize: '18px' }}>Rp {formatRupiah(revenueData.totalRevenue)}</strong></Text>
+                    </Col>
+                    <Col xs={24} lg={14} style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                      <Space wrap>
+                        <Select value={filterTimeRange} onChange={setFilterTimeRange} style={{ width: 160 }}>
+                          <Option value="today">Hari Ini</Option>
+                          <Option value="7d">7 Hari Terakhir</Option>
+                          <Option value="30d">30 Hari Terakhir</Option>
+                          <Option value="all">All Time</Option>
+                          <Option value="custom">Pilih Tanggal...</Option>
+                        </Select>
+                        {filterTimeRange === 'custom' && (
+                          <RangePicker onChange={setCustomDateRange} style={{ width: 220 }} />
+                        )}
+                        <Select value={filterKingdom} onChange={setFilterKingdom} style={{ width: 160 }} showSearch optionFilterProp="children">
+                          <Option value="all">Semua Kingdom</Option>
+                          {kingdoms.map(k => <Option key={k.id} value={k.id}>{k.server_number || k.name}</Option>)}
+                        </Select>
+                        <Select value={filterAdmin} onChange={setFilterAdmin} style={{ width: 160 }} showSearch optionFilterProp="children">
+                          <Option value="all">Semua Admin</Option>
+                          {uniqueAdmins.map(admin => <Option key={admin} value={admin}>{admin}</Option>)}
+                        </Select>
+                      </Space>
+                    </Col>
+                  </Row>
 
-                  {/* WIDGET 2: Kapasitas Farm */}
-                  <Col xs={24} lg={8}>
-                    <Card className="overlapping-card" styles={{ body: { padding: '24px' } }}>
-                      <Title level={5} style={{ marginBottom: 24, borderBottom: '1px solid #f0f0f0', paddingBottom: 12 }}>Kapasitas Farm (Akun)</Title>
-                      <div style={{ textAlign: 'center' }}>
-                        <Progress 
-                          type="dashboard" 
-                          percent={stats.totalCharacters > 0 ? Math.round((stats.activeAccounts / stats.totalCharacters) * 100) : 0}
-                          strokeColor="#1677ff"
-                          size={150}
-                          format={percent => <span style={{ fontSize: '28px', fontWeight: 'bold' }}>{percent}%</span>}
-                        />
-                        <Text type="secondary" style={{ display: 'block', marginTop: -15 }}>Proporsi Akun Aktif</Text>
+                  <div style={{ height: 400, width: '100%' }}>
+                    {revenueData.chartData.length === 0 ? (
+                      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text type="secondary">Tidak ada data pendapatan untuk filter yang dipilih.</Text>
                       </div>
-                      <Row style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
-                        <Col span={12} style={{ textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>
-                          <Text type="secondary">Akun Aktif</Text>
-                          <Title level={4} style={{ margin: 0, color: '#1677ff' }}>{stats.activeAccounts}</Title>
-                        </Col>
-                        <Col span={12} style={{ textAlign: 'center' }}>
-                          <Text type="secondary">Total Karakter</Text>
-                          <Title level={4} style={{ margin: 0 }}>{stats.totalCharacters}</Title>
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-
-                  {/* WIDGET 3: Jangkauan Sistem */}
-                  <Col xs={24} lg={8}>
-                    <Card className="overlapping-card" styles={{ body: { padding: '24px' } }}>
-                      <Title level={5} style={{ marginBottom: 24, borderBottom: '1px solid #f0f0f0', paddingBottom: 12 }}>Jangkauan Sistem</Title>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1, textAlign: 'center' }}>
-                          <Progress 
-                            type="circle" 
-                            percent={100} 
-                            strokeColor="#722ed1"
-                            size={120}
-                            format={() => <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#722ed1' }}>{stats.totalKingdoms}</span>}
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={revenueData.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#1677ff" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#1677ff" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#333' : '#e8e8e8'} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={isDarkMode ? '#888' : '#8c8c8c'} 
+                            tick={{ fontSize: 12 }} 
+                            tickMargin={10}
                           />
-                          <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>Total Kingdom</Text>
-                        </div>
-                        <div style={{ flex: 1, paddingLeft: 16 }}>
-                          <div style={{ marginBottom: 16, padding: '12px', background: 'rgba(114,46,209,0.05)', borderRadius: '8px', borderLeft: '4px solid #722ed1' }}>
-                            <Text type="secondary" style={{ display: 'block' }}>Total Pelanggan</Text>
-                            <Title level={3} style={{ margin: 0, color: '#722ed1' }}>{stats.totalCustomers}</Title>
-                          </div>
-                          <Text type="secondary" style={{ fontSize: '12px' }}>*Pelanggan tersebar di seluruh server aktif.</Text>
-                        </div>
-                      </div>
-                    </Card>
-                  </Col>
-                </Row>
+                          <YAxis 
+                            stroke={isDarkMode ? '#888' : '#8c8c8c'} 
+                            tickFormatter={(value) => `Rp ${formatRupiah(value)}`}
+                            tick={{ fontSize: 12 }}
+                            width={100}
+                          />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: isDarkMode ? '#1f1f1f' : '#fff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                            formatter={(value) => [`Rp ${new Intl.NumberFormat('id-ID').format(value)}`, 'Pendapatan']}
+                          />
+                          <Area type="monotone" dataKey="total" stroke="#1677ff" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </Card>
 
               {/* BARIS 2: LEADERBOARD & TAKSIRAN STOK (SIDE BY SIDE) */}
               <Row gutter={[24, 24]} style={{ padding: '0 24px', paddingBottom: '32px' }}>
