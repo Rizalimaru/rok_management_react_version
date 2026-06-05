@@ -12,6 +12,8 @@ const { Search } = AntInput;
 
 const GameAccounts = () => {
   const [accounts, setAccounts] = useState([]);
+  const [kingdoms, setKingdoms] = useState([]);
+  const [characters, setCharacters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -27,8 +29,9 @@ const GameAccounts = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // State untuk pencarian
+  // State untuk pencarian dan filter
   const [searchText, setSearchText] = useState('');
+  const [filterKingdom, setFilterKingdom] = useState(null);
 
   // 1. READ: Mengambil data dari Firestore secara real-time
   useEffect(() => {
@@ -41,7 +44,20 @@ const GameAccounts = () => {
       setAccounts(accountsData);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
+      setKingdoms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubCharacters = onSnapshot(collection(db, 'characters'), (snapshot) => {
+      setCharacters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribe();
+      unsubKingdoms();
+      unsubCharacters();
+    };
   }, []);
 
   const showAddModal = () => {
@@ -217,14 +233,24 @@ const GameAccounts = () => {
 
   const columns = isMobile ? mobileColumns : desktopColumns;
 
-  // Logika untuk Global Search (Mencari berdasarkan Email atau Catatan/Notes)
+  // Logika untuk Global Search dan Filter Kingdom
   const filteredAccounts = accounts.filter((acc) => {
     const searchLower = searchText.toLowerCase();
     
     const emailMatch = (acc.email || '').toLowerCase().includes(searchLower);
     const notesMatch = (acc.notes || '').toLowerCase().includes(searchLower);
+    const textMatch = emailMatch || notesMatch;
 
-    return emailMatch || notesMatch;
+    let kingdomMatch = true;
+    if (filterKingdom) {
+      // Cari apakah ada karakter milik akun ini yang berada di Kingdom yang dipilih
+      kingdomMatch = characters.some(char => 
+        String(char.game_account_id) === String(acc.id) && 
+        String(char.kingdom_id) === String(filterKingdom)
+      );
+    }
+
+    return textMatch && kingdomMatch;
   });
 
   return (
@@ -233,6 +259,20 @@ const GameAccounts = () => {
         <Title level={3} style={{ margin: 0 }}>Game Accounts</Title>
         
         <Space style={{ flexWrap: 'wrap' }}>
+          <Select
+            allowClear
+            showSearch
+            placeholder="Filter Kingdom..."
+            style={{ width: 180 }}
+            onChange={setFilterKingdom}
+            optionFilterProp="children"
+          >
+            {kingdoms.map(kd => (
+              <Option key={kd.id} value={kd.id}>
+                {kd.server_number ? `Server ${kd.server_number}` : kd.name}
+              </Option>
+            ))}
+          </Select>
           <Search 
             placeholder="Cari Email / Notes..." 
             allowClear 

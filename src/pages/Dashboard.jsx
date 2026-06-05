@@ -194,7 +194,7 @@ const Dashboard = () => {
 
     if (startDate && filterTimeRange !== 'all') {
       filteredOrders = filteredOrders.filter(o => {
-        const orderDate = o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : (o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : null);
+        const orderDate = o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : (o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : null);
         if (!orderDate) return false;
         return orderDate.isAfter(startDate) && orderDate.isBefore(endDate);
       });
@@ -202,7 +202,7 @@ const Dashboard = () => {
 
     const grouped = {};
     filteredOrders.forEach(o => {
-      const orderDate = o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : (o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : dayjs());
+      const orderDate = o.created_at ? dayjs(o.created_at.toDate ? o.created_at.toDate() : o.created_at) : (o.completed_at ? dayjs(o.completed_at.toDate ? o.completed_at.toDate() : o.completed_at) : dayjs());
       const dateStr = orderDate.format('DD MMM YYYY');
       
       if (!grouped[dateStr]) {
