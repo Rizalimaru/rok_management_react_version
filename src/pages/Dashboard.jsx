@@ -13,11 +13,13 @@ import {
   UserOutlined,
   TeamOutlined,
   GlobalOutlined,
-  LogoutOutlined,
   ArrowUpOutlined,
   BellOutlined,
   IdcardOutlined,
-  LineChartOutlined
+  LineChartOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
+  LogoutOutlined
 } from '@ant-design/icons';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
@@ -35,6 +37,43 @@ const Dashboard = () => {
   const [collapsed, setCollapsed] = useState(window.innerWidth < 992); // Auto collapse on load for mobile
   const [user, setUser] = useState(null);
   const { isDarkMode, toggleTheme } = useContext(ThemeContext);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = React.useRef(null);
+
+  const toggleAudio = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(e => message.error('Gagal memutar audio: ' + e.message));
+      }
+    }
+  };
+
+  // Logika Autoplay dengan Fallback Interaksi
+  useEffect(() => {
+    if (audioRef.current) {
+      // Coba putar otomatis
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        // Jika diblokir oleh kebijakan browser, putar saat pengguna pertama kali klik di manapun
+        console.log("Autoplay diblokir browser. Musik akan diputar saat klik pertama.");
+        const playOnInteraction = () => {
+          if (audioRef.current) {
+            audioRef.current.play()
+              .then(() => setIsPlaying(true))
+              .catch(() => {});
+          }
+          document.removeEventListener('click', playOnInteraction);
+        };
+        document.addEventListener('click', playOnInteraction);
+        
+        return () => document.removeEventListener('click', playOnInteraction);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -396,47 +435,72 @@ const Dashboard = () => {
     ],
   };
 
+  const menuIconStyle = { width: 27, height: 27, objectFit: 'contain', marginRight: 12 };
   const menuItems = [
-    { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Dashboard Overview</Link> },
-    { key: '/orders', icon: <ShoppingCartOutlined />, label: <Link to="/orders">Orders</Link> },
-    { key: '/game-accounts', icon: <UserOutlined />, label: <Link to="/game-accounts">Game Accounts</Link> },
-    { key: '/characters', icon: <TeamOutlined />, label: <Link to="/characters">Characters</Link> },
-    { key: '/kingdoms', icon: <GlobalOutlined />, label: <Link to="/kingdoms">Kingdoms</Link> },
-    { key: '/customers', icon: <IdcardOutlined />, label: <Link to="/customers">Customers</Link> },
-    { key: '/reports', icon: <LineChartOutlined />, label: <Link to="/reports">Laporan Keuangan</Link> },
+    { key: '/', icon: <img src={`${import.meta.env.BASE_URL}icon-dashboard.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/">Dashboard Overview</Link> },
+    { key: '/orders', icon: <img src={`${import.meta.env.BASE_URL}icon-orders.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/orders">Orders</Link> },
+    { key: '/game-accounts', icon: <img src={`${import.meta.env.BASE_URL}icon-accounts.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/game-accounts">Game Accounts</Link> },
+    { key: '/characters', icon: <img src={`${import.meta.env.BASE_URL}icon-characters.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/characters">Characters</Link> },
+    { key: '/kingdoms', icon: <img src={`${import.meta.env.BASE_URL}icon-kingdoms.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/kingdoms">Kingdoms</Link> },
+    { key: '/customers', icon: <img src={`${import.meta.env.BASE_URL}icon-customers.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/customers">Customers</Link> },
+    { key: '/reports', icon: <img src={`${import.meta.env.BASE_URL}icon-reports.png`} style={menuIconStyle} alt="icon" />, label: <Link to="/reports">Laporan Keuangan</Link> },
   ];
 
   if (!user) return <div style={{ minHeight: '100vh', background: '#f5f5f5' }}></div>;
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', position: 'relative' }} className="glass-layout">
+      {/* BACKGROUND VIDEO */}
+      <video className="frieren-video-bg" autoPlay loop muted playsInline>
+        <source src={`${import.meta.env.BASE_URL}frieren-bg.mp4`} type="video/mp4" />
+      </video>
+
+      {/* BACKGROUND AUDIO */}
+      <audio 
+        ref={audioRef} 
+        loop 
+        autoPlay
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      >
+        <source src={`${import.meta.env.BASE_URL}frieren-bgm.mp3`} type="audio/mpeg" />
+      </audio>
+
       {/* SIDEBAR */}
       {!isMobile ? (
         <Sider 
           trigger={null} 
           collapsible 
           collapsed={collapsed}
-          theme="dark"
-          style={{ background: '#001529' }}
+          theme={isDarkMode ? "dark" : "light"}
+          className="glass-sidebar"
         >
           <div style={{ 
-            height: 64, 
+            height: 80, 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            borderBottom: '1px solid rgba(255,255,255,0.1)'
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            padding: '10px 0'
           }}>
-            <Title level={4} style={{ color: '#fff', margin: 0, transition: 'all 0.3s' }}>
-              {collapsed ? 'RoK' : 'RoK Portal'}
-            </Title>
+            <img 
+              src={`${import.meta.env.BASE_URL}logo.png`} 
+              alt="Logo" 
+              style={{ 
+                maxHeight: '60px', 
+                maxWidth: collapsed ? '60px' : '200px', 
+                transition: 'all 0.3s',
+                objectFit: 'contain'
+              }} 
+            />
           </div>
           
           <Menu
-            theme="dark"
+            theme={isDarkMode ? "dark" : "light"}
             mode="inline"
             selectedKeys={[location.pathname]}
             items={menuItems}
-            style={{ marginTop: '16px' }}
+            style={{ marginTop: '16px', background: 'transparent' }}
           />
         </Sider>
       ) : (
@@ -445,7 +509,7 @@ const Dashboard = () => {
           onClose={() => setCollapsed(true)}
           open={!collapsed}
           styles={{ body: { padding: 0, background: '#001529' }, header: { background: '#001529', borderBottom: '1px solid rgba(255,255,255,0.1)' } }}
-          title={<Title level={4} style={{ color: '#fff', margin: 0 }}>RoK Portal</Title>}
+          title={<img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" style={{ maxHeight: '48px' }} />}
           width={250}
         >
           <Menu
@@ -460,15 +524,13 @@ const Dashboard = () => {
       )}
 
       {/* KONTEN UTAMA */}
-      <Layout>
+      <Layout className="glass-layout">
         {/* HEADER */}
-        <Header style={{
+        <Header className="glass-header" style={{
           padding: isMobile ? '0 16px' : '0 24px',
-          background: colorBgContainer,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 1px 4px rgba(0,21,41,0.08)',
           zIndex: 1
         }}>
           <Button
@@ -479,6 +541,13 @@ const Dashboard = () => {
           />
 
           <Space size="large" align="center">
+            <Button 
+              type="text" 
+              icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />} 
+              onClick={toggleAudio}
+              style={{ color: isDarkMode ? '#fff' : '#101828' }}
+              title={isPlaying ? "Matikan Musik" : "Putar Musik"}
+            />
             <Switch
               checked={isDarkMode}
               onChange={toggleTheme}
@@ -491,25 +560,25 @@ const Dashboard = () => {
                   <Text strong style={{ display: 'block', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>Admin</Text>
                   <Text type="secondary" style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{user.email}</Text>
                 </div>
-                <Avatar style={{ backgroundColor: '#d1a054' }} icon={<UserOutlined />} />
+                <Avatar src={`${import.meta.env.BASE_URL}frieren-avatar.png`} style={{ backgroundColor: '#d1a054', border: '2px solid rgba(255,255,255,0.5)' }} />
               </Space>
             </Dropdown>
           </Space>
         </Header>
 
         {/* KONTEN DINAMIS / HALAMAN */}
-        <Content style={{ margin: isMobile ? '16px 8px' : '24px 16px', padding: isMobile ? 12 : 24, background: colorBgContainer, borderRadius: borderRadiusLG, overflowX: 'hidden' }}>
+        <Content style={{ margin: isMobile ? '16px 8px' : '24px 16px', padding: isMobile ? 12 : 24, background: 'transparent', borderRadius: borderRadiusLG, overflowX: 'hidden', position: 'relative', zIndex: 1 }}>
 
           {location.pathname === '/' ? (
             <div style={{ margin: '-24px -16px 0 -16px' }}>
               <div className="dashboard-blue-header">
-                <Title level={3} style={{ color: 'white', margin: 0 }}>Dashboard</Title>
-                <Text style={{ color: 'rgba(255,255,255,0.8)' }}>Terakhir diperbarui: Secara Real-time</Text>
+                <Title level={2} style={{ margin: 0, fontWeight: 800 }}>Dashboard</Title>
+                <Text type="secondary">Terakhir diperbarui: Secara Real-time</Text>
               </div>
 
               <div style={{ padding: '0 24px' }}>
                 {/* GRAFIK PENDAPATAN & FILTER */}
-                <Card className="overlapping-card" style={{ marginBottom: 32 }} styles={{ body: { padding: '24px' } }}>
+                <Card className="overlapping-card glass-card" style={{ marginBottom: 32, position: 'relative', zIndex: 2 }} styles={{ body: { padding: '24px' } }}>
                   <Row justify="space-between" align="middle" style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #f0f0f0' }}>
                     <Col xs={24} lg={10} style={{ marginBottom: isMobile ? 16 : 0 }}>
                       <Title level={4} style={{ margin: 0 }}>Grafik Pendapatan Keseluruhan</Title>
@@ -582,7 +651,7 @@ const Dashboard = () => {
                 
                 {/* KIRI 30%: LEADERBOARD */}
                 <Col xs={24} lg={8}>
-                  <Card title="🏆 Top 5 Server Terlaris" className="overlapping-card" style={{ height: '100%' }}>
+                  <Card title="🏆 Top 5 Server Terlaris" className="overlapping-card glass-card" style={{ height: '100%' }}>
                     {kingdomOverviews.filter(kd => kd.monthlyOrdersCount > 0).length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '20px', color: '#8c8c8c' }}>Belum ada pesanan bulan ini.</div>
                     ) : (
@@ -623,7 +692,7 @@ const Dashboard = () => {
                 <Col xs={24} lg={16}>
                   <Card 
                     title="Taksiran Stok Bersih (Net) per Kingdom" 
-                    className="overlapping-card" 
+                    className="overlapping-card glass-card" 
                     style={{ height: '100%' }}
                   >
                     <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: '13px' }}>

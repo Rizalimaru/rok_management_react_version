@@ -16,9 +16,52 @@ body.dark-mode .hover-card:hover {
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.03) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+}
+
+body.dark-mode .glass-card {
+  background: rgba(0, 0, 0, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.glass-layout {
+  background: transparent !important;
+}
+
+.glass-sidebar {
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+body.dark-mode .glass-sidebar {
+  background: rgba(0, 0, 0, 0.6) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+body.dark-mode .glass-header {
+  background: rgba(0, 0, 0, 0.6) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.frieren-video-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .gradient-income { background: linear-gradient(135deg, rgba(82,196,26,0.15) 0%, transparent 100%) !important; border-left: 4px solid #52c41a !important; }
@@ -76,12 +119,18 @@ body.dark-mode .leaderboard-row:hover {
 
 /* MODERN MINIMALIST OVERLAP DASHBOARD */
 .dashboard-blue-header {
-  background: #1677ff;
+  background: transparent;
   border-radius: 12px;
   padding: 32px 32px 100px 32px;
-  color: white;
+  color: #101828;
   margin-bottom: -70px;
-  box-shadow: 0 4px 12px rgba(22,119,255,0.2);
+  position: relative;
+  z-index: 1;
+}
+
+body.dark-mode .dashboard-blue-header {
+  background: transparent;
+  color: white;
 }
 
 body.dark-mode .dashboard-blue-header {
