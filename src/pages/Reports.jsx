@@ -1,65 +1,143 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Typography, Card, Space, DatePicker, Row, Col, Statistic, InputNumber, message, Collapse } from 'antd';
+import { Table, Typography, Card, Space, DatePicker, Row, Col, Statistic, InputNumber, message, Collapse, Button, Select } from 'antd';
 import { db } from '../config/firebase';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
+// Komponen Input Kustom untuk mencegah Race Condition saat mengetik %
+const RateInput = ({ record, onSave }) => {
+  const [val, setVal] = useState(record.handlerRate);
+  
+  useEffect(() => {
+    setVal(record.handlerRate);
+  }, [record.handlerRate]);
+
+  return (
+    <InputNumber
+      min={0}
+      max={100}
+      value={val}
+      onChange={setVal}
+      onBlur={() => {
+        if (val !== record.handlerRate) onSave(record.id, val);
+      }}
+      onPressEnter={() => {
+        if (val !== record.handlerRate) onSave(record.id, val);
+      }}
+      formatter={value => `${value}%`}
+      parser={value => value.replace('%', '')}
+      style={{ width: '80px' }}
+    />
+  );
+};
+
 const Reports = () => {
   const [orders, setOrders] = useState([]);
   const [kingdoms, setKingdoms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState(null);
+  const [hasFetched, setHasFetched] = useState(false);
 
-  // Fetch Data
+  // Hanya fetch kingdoms secara real-time (karena datanya kecil)
   useEffect(() => {
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
-      // Hanya ambil yang completed
+    const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
+      setKingdoms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubKingdoms();
+  }, []);
+
+  const fetchReportData = async () => {
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      message.warning('Silakan pilih rentang tanggal terlebih dahulu!');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const startDate = dateRange[0].startOf('day').toDate();
+      const endDate = dateRange[1].endOf('day').toDate();
+
+      // Hanya tarik data order yang waktu selesainya berada di rentang tanggal yang dipilih
+      // Ini akan menghemat reads Firebase hingga 99%
+      const q = query(
+        collection(db, 'orders'),
+        where('completed_at', '>=', startDate),
+        where('completed_at', '<=', endDate)
+      );
+
+      const snapshot = await getDocs(q);
+      
       const fetchedOrders = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(o => o.status === 'completed');
+        .filter(o => o.status === 'completed'); // Pastikan hanya status completed
       
-      // Urutkan berdasarkan tanggal selesai terbaru
       fetchedOrders.sort((a, b) => {
-        const dateA = (a.completed_at || a.updated_at || a.created_at)?.toDate ? (a.completed_at || a.updated_at || a.created_at).toDate().getTime() : 0;
-        const dateB = (b.completed_at || b.updated_at || b.created_at)?.toDate ? (b.completed_at || b.updated_at || b.created_at).toDate().getTime() : 0;
+        const dateA = a.completed_at?.toDate ? a.completed_at.toDate().getTime() : 0;
+        const dateB = b.completed_at?.toDate ? b.completed_at.toDate().getTime() : 0;
         return dateB - dateA;
       });
 
       setOrders(fetchedOrders);
+      setHasFetched(true);
+      message.success(`Berhasil menarik ${fetchedOrders.length} data pesanan.`);
+    } catch (error) {
+      console.error(error);
+      if (error.message.includes('index')) {
+        message.error('Sistem membutuhkan Indexing di database. Hubungi developer.');
+      } else {
+        message.error('Gagal mengambil laporan: ' + error.message);
+      }
+    } finally {
       setLoading(false);
-    });
-
-    const unsubKingdoms = onSnapshot(collection(db, 'kingdoms'), (snapshot) => {
-      setKingdoms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    return () => { unsubOrders(); unsubKingdoms(); };
-  }, []);
+    }
+  };
 
   // Filter berdasarkan Range Tanggal (Berdasarkan Waktu Selesai)
-  const filteredOrders = orders.filter(o => {
-    if (!dateRange || !dateRange[0] || !dateRange[1]) return true;
-    
-    const relevantDate = o.completed_at || o.updated_at || o.created_at;
-    if (!relevantDate) return false;
-    const orderDate = relevantDate.toDate ? relevantDate.toDate() : new Date(relevantDate);
-    
-    const normalizedOrderDate = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
-    const startDate = new Date(dateRange[0].year(), dateRange[0].month(), dateRange[0].date());
-    const endDate = new Date(dateRange[1].year(), dateRange[1].month(), dateRange[1].date());
-
-    return normalizedOrderDate >= startDate && normalizedOrderDate <= endDate;
-  });
+  // Karena kita sudah mengambil data yang tepat sesuai rentang waktu dari Firebase (Server-side filtering),
+  // kita tidak perlu memfilter secara manual lagi di Client-side.
+  const filteredOrders = orders;
 
   // Handle Update Rate
   const handleRateChange = async (orderId, newRate) => {
     try {
       await updateDoc(doc(db, 'orders', orderId), { profit_rate: newRate });
+      
+      // Update state lokal agar UI langsung merender ulang perhitungan pembagian
+      setOrders(prevOrders => prevOrders.map(order => 
+        order.id === orderId ? { ...order, profit_rate: newRate } : order
+      ));
+
       message.success('Rate berhasil diupdate');
     } catch (error) {
       message.error('Gagal mengupdate rate: ' + error.message);
+    }
+  };
+
+  // Kumpulkan semua email unik untuk dropdown Partner
+  const uniqueEmails = React.useMemo(() => {
+    const emails = new Set();
+    orders.forEach(o => {
+      if (o.admin_email) emails.add(o.admin_email);
+      if (o.partner_email) emails.add(o.partner_email);
+    });
+    return Array.from(emails);
+  }, [orders]);
+
+  // Handle Update Partner
+  const handlePartnerChange = async (orderId, newPartner) => {
+    try {
+      const partnerEmail = newPartner || null;
+      await updateDoc(doc(db, 'orders', orderId), { partner_email: partnerEmail });
+      
+      setOrders(prevOrders => prevOrders.map(order => 
+        order.id === orderId ? { ...order, partner_email: partnerEmail } : order
+      ));
+
+      message.success('Partner berhasil diupdate');
+    } catch (error) {
+      message.error('Gagal mengupdate partner: ' + error.message);
     }
   };
 
@@ -88,8 +166,15 @@ const Reports = () => {
     grandTotalSisa += sisaBagi;
 
     const handlerEmail = record.admin_email || 'Unknown Admin';
+    const partnerEmail = record.partner_email;
+
     if (!adminIncomes[handlerEmail]) adminIncomes[handlerEmail] = 0;
     adminIncomes[handlerEmail] += jatahHandler;
+
+    if (partnerEmail) {
+      if (!adminIncomes[partnerEmail]) adminIncomes[partnerEmail] = 0;
+      adminIncomes[partnerEmail] += jatahPartner;
+    }
 
     // Menentukan Tanggal Batch
     const relevantDate = record.completed_at || record.updated_at || record.created_at;
@@ -104,8 +189,21 @@ const Reports = () => {
         dateStr: batchKey,
         totalKotor: 0,
         setoranBank: 0,
+        adminOmzet: {},
         orders: []
       };
+    }
+
+    if (!batches[batchKey].adminOmzet[handlerEmail]) {
+      batches[batchKey].adminOmzet[handlerEmail] = 0;
+    }
+    batches[batchKey].adminOmzet[handlerEmail] += jatahHandler; // Jatah bersih Handler
+
+    if (partnerEmail) {
+      if (!batches[batchKey].adminOmzet[partnerEmail]) {
+        batches[batchKey].adminOmzet[partnerEmail] = 0;
+      }
+      batches[batchKey].adminOmzet[partnerEmail] += jatahPartner; // Jatah bersih Partner
     }
 
     batches[batchKey].totalKotor += totalKotor;
@@ -118,7 +216,8 @@ const Reports = () => {
       handlerRate,
       jatahHandler,
       jatahPartner,
-      handlerEmail
+      handlerEmail,
+      partnerEmail
     });
   });
 
@@ -159,19 +258,26 @@ const Reports = () => {
       render: (val) => <Text strong>{new Intl.NumberFormat('id-ID').format(val)}</Text>
     },
     {
+      title: 'Partner',
+      key: 'partner',
+      render: (_, record) => (
+        <Select
+          mode="tags"
+          maxCount={1}
+          style={{ width: 140 }}
+          placeholder="Pilih/Ketik Email"
+          value={record.partnerEmail ? [record.partnerEmail] : []}
+          onChange={(val) => handlePartnerChange(record.id, val[0])}
+          options={uniqueEmails.map(email => ({ value: email, label: email.split('@')[0] }))}
+        />
+      )
+    },
+    {
       title: 'Pembagian (%)',
       key: 'rate',
       align: 'center',
       render: (_, record) => (
-        <InputNumber
-          min={0}
-          max={100}
-          value={record.handlerRate}
-          onChange={(val) => handleRateChange(record.id, val)}
-          formatter={value => `${value}%`}
-          parser={value => value.replace('%', '')}
-          style={{ width: '80px' }}
-        />
+        <RateInput record={record} onSave={handleRateChange} />
       )
     },
     {
@@ -193,9 +299,14 @@ const Reports = () => {
   const collapseItems = Object.values(batches).map((batch, index) => ({
     key: String(index),
     label: (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '24px', flexWrap: 'wrap', gap: '8px' }}>
         <Text strong style={{ fontSize: '16px' }}>Batch: {batch.dateStr}</Text>
-        <Space size="large">
+        <Space size="large" wrap>
+          {Object.keys(batch.adminOmzet).map(admin => (
+            <Text type="secondary" key={admin}>
+              Pendapatan {admin.split('@')[0]}: <Text strong style={{ color: '#52c41a' }}>Rp {new Intl.NumberFormat('id-ID').format(batch.adminOmzet[admin])}</Text>
+            </Text>
+          ))}
           <Text type="secondary">Total Omset: <Text strong style={{ color: '#1677ff' }}>Rp {new Intl.NumberFormat('id-ID').format(batch.totalKotor)}</Text></Text>
           <Text type="secondary">Setoran Bank: <Text strong style={{ color: '#faad14' }}>Rp {new Intl.NumberFormat('id-ID').format(batch.setoranBank)}</Text></Text>
         </Space>
@@ -219,10 +330,18 @@ const Reports = () => {
         <Title level={3} style={{ margin: 0 }}>Laporan Keuangan</Title>
         <Space>
           <Text strong>Filter Tanggal Selesai:</Text>
+          <Text strong>Pilih Rentang Tanggal:</Text>
           <RangePicker 
-            onChange={(dates) => setDateRange(dates)} 
+            onChange={(dates) => {
+              setDateRange(dates);
+              setHasFetched(false); // Reset status fetch saat tanggal diubah
+            }} 
             format="DD MMM YYYY"
+            style={{ width: 260 }}
           />
+          <Button type="primary" onClick={fetchReportData} loading={loading}>
+            Tarik Laporan
+          </Button>
         </Space>
       </div>
 
@@ -257,6 +376,10 @@ const Reports = () => {
       {/* BATCH COLLAPSE */}
       {loading ? (
         <Card loading={true} />
+      ) : !hasFetched ? (
+        <Card style={{ textAlign: 'center', padding: '40px' }}>
+          <Title level={4} style={{ color: '#8c8c8c', margin: 0 }}>Pilih tanggal dan tekan "Tarik Laporan" untuk menampilkan data.</Title>
+        </Card>
       ) : collapseItems.length === 0 ? (
         <Card><Text type="secondary">Tidak ada data pesanan yang selesai pada periode ini.</Text></Card>
       ) : (
